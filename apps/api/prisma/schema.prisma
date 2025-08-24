@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User profile model - sincronizado com auth.users do Supabase
+model User {
+  id         String   @id // UUID do Supabase Auth
+  email      String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  // Campos de perfil customizados
+  name       String?
+  avatar_url String?
+  
+  @@map("users")
+}
+
+// Exemplo de modelo relacionado ao usuário
+model UserProfile {
+  id      String  @id @default(uuid())
+  user_id String  @unique
+  bio     String?
+  phone   String?
+  
+  // Relacionamento com auth.users do Supabase
+  // user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  @@map("user_profiles")
+}

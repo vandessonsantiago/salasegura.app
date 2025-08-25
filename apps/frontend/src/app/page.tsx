@@ -3,16 +3,14 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import LandingHeader from "@/components/LandingHeader";
-import LandingMain, { LandingMainRef } from "@/components/LandingMain";
-import LandingFooter from "@/components/LandingFooter";
+import { Header, Main, Footer, MainRef } from "@/components/layout";
 import { ChatSession } from "@/hooks/useChatStorage";
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [footerMessage, setFooterMessage] = useState<string>('');
-  const mainRef = useRef<LandingMainRef>(null);
+  const mainRef = useRef<MainRef>(null);
 
   // Se o usuário já está logado, redirecionar para o dashboard
   useEffect(() => {
@@ -62,15 +60,20 @@ export default function LandingPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <LandingHeader 
+      <Header 
         onResetChat={handleResetChat}
         onLoadSession={handleLoadSession}
       />
-      <LandingMain 
+      <Main 
         ref={mainRef}
-        initialMessage={footerMessage} 
+        mode="landing"
+        initialMessage={footerMessage}
+        onNewMessage={() => {}}
       />
-      <LandingFooter onSendMessage={handleFooterMessage} />
+      <Footer 
+        onSendMessage={handleFooterMessage}
+        placeholder="Digite sua pergunta..."
+      />
     </div>
   );
 }

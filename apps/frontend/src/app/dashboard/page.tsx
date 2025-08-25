@@ -2,16 +2,17 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Loading from '../loading';
-import Header from '../components/Header';
-import Main, { MainRef } from '../components/Main';
-import Footer from '../components/Footer';
+import { Header, Main, Footer, MainRef } from '@/components/layout';
+import UserMenu from '../components/UserMenu';
+import Hero from '../components/Hero';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const mainRef = useRef<MainRef>(null);
+  const [footerMessage, setFooterMessage] = useState<string>('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -23,9 +24,8 @@ export default function DashboardPage() {
   // Função para Footer enviar mensagem para Main
   const handleFooterMessage = (message: string) => {
     console.log('🔄 Dashboard: Footer enviando mensagem para Main:', message);
-    if (mainRef.current) {
-      mainRef.current.sendMessage(message);
-    }
+    const timestampedMessage = `${message}|${Date.now()}`;
+    setFooterMessage(timestampedMessage);
   };
 
   // Mostrar loading enquanto verifica autenticação
@@ -40,9 +40,21 @@ export default function DashboardPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <Header />
-      <Main ref={mainRef} isDashboard={true} />
-      <Footer onSendMessage={handleFooterMessage} />
+      <Header 
+        showUserMenu={true}
+        UserMenuComponent={UserMenu}
+      />
+      <Main 
+        ref={mainRef} 
+        mode="dashboard"
+        HeroComponent={Hero}
+        initialMessage={footerMessage}
+        onNewMessage={() => {}}
+      />
+      <Footer 
+        onSendMessage={handleFooterMessage}
+        placeholder="Pergunte sobre divórcio, pensão alimentícia, guarda..."
+      />
     </div>
   );
 }

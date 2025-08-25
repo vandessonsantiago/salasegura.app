@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { useState } from "react";
-import Logo from "@/components/Logo";
-import MessageModal from "@/components/MessageModal";
+import { Logo, MessageModal } from "@/components/ui";
 import { ChatSession } from "@/hooks/useChatStorage";
 
 interface HeaderProps {

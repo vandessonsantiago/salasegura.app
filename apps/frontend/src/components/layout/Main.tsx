@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import ChatContainer, { ChatContainerRef } from '@/components/ChatContainer';
-import DashboardChat, { DashboardChatRef } from '@/components/shared/DashboardChat';
+import ChatContainer, { ChatContainerRef } from '@/components/chat/ChatContainer';
+import { DashboardChat, DashboardChatRef } from '@/components/chat';
 import { ChatSession } from '@/hooks/useChatStorage';
 import { DashboardChatSession } from '@/hooks/useDashboardChatStorage';
 

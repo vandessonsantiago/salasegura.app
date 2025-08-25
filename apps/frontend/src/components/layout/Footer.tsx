@@ -1,6 +1,6 @@
 'use client';
 
-import ChatInput from '@/app/components/ChatInput';
+import { ChatInput } from '@/components/chat';
 
 interface FooterProps {
   onSendMessage?: (message: string) => void;

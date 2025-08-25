@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Loading from '../loading';
 import { Header, Main, Footer, MainRef } from '@/components/layout';
-import UserMenu from '../components/UserMenu';
-import Hero from '../components/Hero';
+import { UserMenu, Hero } from '@/components/sections';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();

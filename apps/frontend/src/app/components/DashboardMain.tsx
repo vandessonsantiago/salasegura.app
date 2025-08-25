@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import Hero from './Hero';
-import DashboardChat, { DashboardChatRef } from '@/components/shared/DashboardChat';
+import { Hero } from '@/components/sections';
+import { DashboardChat, DashboardChatRef } from '@/components/chat';
 import { DashboardChatSession } from '@/hooks/useDashboardChatStorage';
 
 interface DashboardMainProps {

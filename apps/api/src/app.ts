@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth";
 import protectedRoutes from "./routes/protected";
 import chatRoutes from "./routes/chat";
 import conversionsRoutes from "./routes/conversions";
+import dashboardChatRoutes from "./routes/dashboardChat";
 import { errorHandler } from "./middleware/errorHandler";
 const express = require('express');
 import { requestLogger } from "./middleware/requestLogger";
@@ -39,6 +40,9 @@ export const createApp = (): Express => {
 
   // Rotas de chat
   app.use("/api/chat", chatRoutes);
+
+  // Rotas de chat do dashboard (divórcio/direito família)
+  app.use("/api/dashboard-chat", dashboardChatRoutes);
 
   // Rotas de conversão (registro via chat)
   app.use("/api/conversions", conversionsRoutes);

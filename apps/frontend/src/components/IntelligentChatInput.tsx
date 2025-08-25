@@ -4,9 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { ArrowUp, ChatCircle } from 'phosphor-react';
 import { useChatStorage, ChatMessage } from '@/hooks/useChatStorage';
 import { useIntelligentChat } from '@/hooks/useIntelligentChat';
-import ChatMessageComponent from './ChatMessageComponent';
-import TypingAnimation from './TypingAnimation';
-import ThinkingAnimation from './ThinkingAnimation';
+import ChatMessageComponent from './shared/ChatMessageComponent';
+import TypingAnimation from './shared/TypingAnimation';
+import ThinkingAnimation from './shared/ThinkingAnimation';
 
 interface IntelligentChatInputProps {
   title?: string;

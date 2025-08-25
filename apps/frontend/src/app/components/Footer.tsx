@@ -1,10 +1,25 @@
-import IntelligentChatInput from '@/components/IntelligentChatInput';
+import ChatInput from './ChatInput';
 
-export default function Footer() {
+interface FooterProps {
+  onSendMessage?: (message: string) => void;
+}
+
+export default function Footer({ onSendMessage }: FooterProps = {}) {
+  const handleSendMessage = (message: string) => {
+    console.log('📤 DashboardFooter enviando:', message);
+    if (onSendMessage) {
+      onSendMessage(message);
+    }
+  };
+
   return (
     <footer className="p-4 flex-shrink-0 bg-white border-t border-gray-100">
       <div className="mb-3">
-        <IntelligentChatInput />
+        <ChatInput 
+          onSendMessage={handleSendMessage}
+          showIcon={false}
+          placeholder="Pergunte sobre divórcio, pensão alimentícia, guarda..."
+        />
       </div>
       
       {/* Legal Text */}

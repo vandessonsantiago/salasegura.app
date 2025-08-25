@@ -1,9 +1,9 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, Router } from "express";
 import crypto from "crypto";
 import { supabaseAdmin as supabase } from "../lib/supabase";
 import { PrismaClient } from "../generated/prisma";
 
-const router = express.Router();
+const router: Router = express.Router();
 const prisma = new PrismaClient();
 
 interface ConversionRequest {
@@ -49,8 +49,54 @@ router.post('/', async (req: Request, res: Response) => {
 
     console.log('🔍 Processando conversão para:', { name, email, whatsapp });
 
-    // TEMPORÁRIO: Pular verificação de usuário existente para testar inserção na tabela
-    console.log('⚠️  TESTE: Pulando verificação de usuário existente...');
+    // Verificar se o usuário já existe no Supabase
+    // Fazemos isso tentando um signup temporário e verificando o erro
+    console.log('🔍 Verificando se usuário já existe...');
+    
+    try {
+      const { data: testUser, error: existsError } = await supabase.auth.admin.createUser({
+        email: email,
+        password: 'temp123456789', // Senha temporária
+        email_confirm: false, // Não confirmar email
+      });
+      
+      // Se deu erro de usuário já existente
+      if (existsError && (
+        existsError.message?.toLowerCase().includes('already') ||
+        existsError.message?.toLowerCase().includes('exists') ||
+        existsError.message?.toLowerCase().includes('registered')
+      )) {
+        console.log('⚠️ Usuário já existe:', email);
+        return res.status(409).json({
+          success: false,
+          error: "email_exists", 
+          message: "Este email já possui uma conta cadastrada",
+          shouldShowLogin: true
+        });
+      }
+      
+      // Se foi outro erro
+      if (existsError) {
+        console.error('❌ Erro ao verificar usuário:', existsError);
+        return res.status(500).json({
+          success: false,
+          error: "Erro ao processar solicitação",
+        });
+      }
+      
+      // Se chegou até aqui, usuário não existe, então deletamos o usuário temporário
+      if (testUser?.user?.id) {
+        await supabase.auth.admin.deleteUser(testUser.user.id);
+        console.log('✅ Email disponível para novo usuário');
+      }
+
+    } catch (verificationError: any) {
+      console.error('❌ Erro na verificação de usuário:', verificationError);
+      return res.status(500).json({
+        success: false,
+        error: "Erro ao processar solicitação",
+      });
+    }
 
     // Gerar token de acesso único
     const accessToken = crypto.randomBytes(32).toString("hex");

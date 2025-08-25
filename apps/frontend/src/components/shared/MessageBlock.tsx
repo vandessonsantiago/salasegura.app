@@ -220,8 +220,10 @@ export default function MessageBlock({
 
       {/* Formulário de contato integrado na mensagem */}
       {message.conversionData?.shouldConvert && !message.conversionData?.emailExists && onContactSubmit && (
-        <div className="mt-4">
-          <ContactFormMessage onSubmit={onContactSubmit} />
+        <div className="flex justify-center mt-6 w-full">
+          <div className="w-full max-w-lg">
+            <ContactFormMessage onSubmit={onContactSubmit} />
+          </div>
         </div>
       )}
 

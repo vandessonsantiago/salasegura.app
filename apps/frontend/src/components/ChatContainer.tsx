@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useChatStorage, ChatMessage, ChatSession } from '@/hooks/useChatStorage';
 import { ChatService } from '@/services/chatService';
-import MessageBlock from './MessageBlock';
-import TypingAnimation from './TypingAnimation';
-import ThinkingAnimation from './ThinkingAnimation';
+import MessageBlock from './shared/MessageBlock';
+import TypingAnimation from './shared/TypingAnimation';
+import ThinkingAnimation from './shared/ThinkingAnimation';
 
 interface ChatContainerProps {
   onChatStart?: (started: boolean) => void;

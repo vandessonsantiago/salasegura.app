@@ -13,7 +13,7 @@ importers:
         version: 17.2.1
     devDependencies:
       prettier:
-        specifier: ^3.6.0
+        specifier: ^3.6.2
         version: 3.6.2
       turbo:
         specifier: ^2.5.6

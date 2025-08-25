@@ -2,15 +2,16 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Loading from '../loading';
 import Header from '../components/Header';
-import Main from '../components/Main';
+import Main, { MainRef } from '../components/Main';
 import Footer from '../components/Footer';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const mainRef = useRef<MainRef>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -18,6 +19,14 @@ export default function DashboardPage() {
       return;
     }
   }, [user, loading, router]);
+
+  // Função para Footer enviar mensagem para Main
+  const handleFooterMessage = (message: string) => {
+    console.log('🔄 Dashboard: Footer enviando mensagem para Main:', message);
+    if (mainRef.current) {
+      mainRef.current.sendMessage(message);
+    }
+  };
 
   // Mostrar loading enquanto verifica autenticação
   if (loading) {
@@ -32,8 +41,8 @@ export default function DashboardPage() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <Header />
-      <Main />
-      <Footer />
+      <Main ref={mainRef} isDashboard={true} />
+      <Footer onSendMessage={handleFooterMessage} />
     </div>
   );
 }

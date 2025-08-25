@@ -1,11 +1,21 @@
-import Hero from "./Hero";
+import { forwardRef } from 'react';
+import DashboardMain, { DashboardMainRef } from './DashboardMain';
 
-export default function Main() {
-  return (
-    <main className="flex-1 overflow-y-auto p-2 sm:p-4">
-      <div className="w-full max-w-full sm:max-w-md lg:max-w-5xl mx-auto flex items-center justify-center min-h-full">
-        <Hero />
-      </div>
-    </main>
-  );
+interface MainProps {
+  initialMessage?: string;
+  onNewMessage?: (message: string) => void;
 }
+
+const Main = forwardRef<DashboardMainRef, MainProps>(({ initialMessage, onNewMessage }, ref) => {
+  return (
+    <DashboardMain 
+      ref={ref}
+      initialMessage={initialMessage}
+      onNewMessage={onNewMessage}
+    />
+  );
+});
+
+Main.displayName = 'Main';
+
+export default Main;

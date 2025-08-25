@@ -10,3 +10,14 @@ dist-ssr
 .cache
 server/dist
 public/dist
+
+# Temporary and backup files
+*.tmp
+*.backup
+*.snapshot
+
+# Avoid recreating removed apps
+apps/web/
+apps/admin/
+apps/blog/
+apps/storefront/

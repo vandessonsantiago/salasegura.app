@@ -1,0 +1,28 @@
+{
+  "extends": "@vandessonsantiago/config/tsconfig/nextjs",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "hooks/**/*.ts",
+    "lib/**/*.ts",
+    "*.ts",
+    "*.tsx",
+    "next-env.d.ts",
+    "next.config.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".turbo"
+  ]
+}
+
+

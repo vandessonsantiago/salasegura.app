@@ -6,11 +6,16 @@ import { appConfig } from "./config/app";
 const app = createApp();
 const { port } = appConfig;
 
-app.listen(port, () => {
+const server = app.listen(port, 'localhost', () => {
   log(`🚀 API server running on port ${port}`);
   log(`📊 Health check: http://localhost:${port}/api/health/status`);
   log(`💬 Messages: http://localhost:${port}/api/message/:name`);
   log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+});
+
+server.on('error', (err) => {
+  log(`❌ Server error: ${err.message}`);
+  process.exit(1);
 });
 
 // Graceful shutdown

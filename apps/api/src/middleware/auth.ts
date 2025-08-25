@@ -1,15 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-  };
-}
-
 export const authenticateToken = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -34,6 +27,11 @@ export const authenticateToken = async (
     req.user = {
       id: user.id,
       email: user.email!,
+      name: user.user_metadata?.name || null,
+      created_at: new Date(user.created_at),
+      updated_at: new Date(user.updated_at || user.created_at),
+      avatar_url: user.user_metadata?.avatar_url || null,
+      phone: user.phone || null,
     };
 
     next();

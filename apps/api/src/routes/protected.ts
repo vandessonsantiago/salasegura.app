@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { authenticateToken } from '../middleware/auth';
 const express = require('express');
 
 const router = express.Router();
 
 // Rota protegida - requer autenticação
-router.get('/profile', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/profile', authenticateToken, async (req: Request, res: Response) => {
   try {
     // O usuário está disponível em req.user devido ao middleware
     const user = req.user!;
@@ -22,7 +22,7 @@ router.get('/profile', authenticateToken, async (req: AuthenticatedRequest, res:
 });
 
 // Rota protegida para atualizar perfil
-router.put('/profile', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
     const { name, bio } = req.body;

@@ -1,7 +1,14 @@
-import { CheckSquare, Users, Calendar } from 'phosphor-react';
+import { CheckSquare, Users, Calendar, SignIn } from 'phosphor-react';
+import { useRouter } from 'next/navigation';
 import CardHero from './CardHero';
 
 export default function Hero() {
+  const router = useRouter();
+
+  const handleLogin = () => {
+    router.push('/login');
+  };
+
   return (
     <section className="py-4 w-full">
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 items-center justify-center">
@@ -12,6 +19,7 @@ export default function Hero() {
         </div>
         <div className="w-full lg:w-96 min-w-0 px-2 lg:px-0">
           <div className="grid gap-3 lg:gap-4">
+            
             {/* Card 1 - Checklist Gratuito */}
             <CardHero
               icon={<CheckSquare size={22} />}

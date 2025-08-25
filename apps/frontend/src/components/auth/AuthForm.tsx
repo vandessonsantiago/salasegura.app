@@ -7,9 +7,10 @@ import { supabase } from '@/lib/supabase';
 interface AuthFormProps {
   view?: 'sign_in' | 'sign_up';
   redirectTo?: string;
+  allowSignUp?: boolean; // Controlar se permite cadastro
 }
 
-export function AuthForm({ view = 'sign_in', redirectTo }: AuthFormProps) {
+export function AuthForm({ view = 'sign_in', redirectTo, allowSignUp = false }: AuthFormProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <Auth
@@ -25,10 +26,10 @@ export function AuthForm({ view = 'sign_in', redirectTo }: AuthFormProps) {
             },
           },
         }}
-        providers={['google', 'github']}
+        providers={allowSignUp ? ['google', 'github'] : []} // Providers apenas se cadastro permitido
         redirectTo={redirectTo}
         view={view}
-        showLinks={true}
+        showLinks={allowSignUp} // Links apenas se cadastro permitido
         localization={{
           variables: {
             sign_in: {

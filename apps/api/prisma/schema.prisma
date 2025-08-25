@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -14,32 +8,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User profile model - sincronizado com auth.users do Supabase
 model User {
-  id         String   @id // UUID do Supabase Auth
-  email      String   @unique
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  
-  // Campos de perfil customizados
+  id         String        @id
+  email      String        @unique
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
   name       String?
   avatar_url String?
-  
+  phone      String?
+  profile    UserProfile?
+  sessions   UserSession[]
+
   @@map("users")
 }
 
-// Exemplo de modelo relacionado ao usuário
 model UserProfile {
-  id      String  @id @default(uuid())
-  user_id String  @unique
-  bio     String?
-  phone   String?
-  
-  // Relacionamento com auth.users do Supabase
-  // user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(uuid())
+  user_id    String   @unique
+  bio        String?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
-  
+  company    String?
+  language   String?  @default("pt-BR")
+  location   String?
+  theme      String?  @default("light")
+  timezone   String?  @default("America/Sao_Paulo")
+  website    String?
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@map("user_profiles")
+}
+
+model UserSession {
+  id         String    @id @default(uuid())
+  user_id    String
+  ip_address String?
+  user_agent String?
+  expires_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  user_id    String?
+  action     String
+  details    Json?
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+
+  @@map("activity_logs")
+}
+
+model AppSettings {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String
+  type       String   @default("string")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model Conversion {
+  id           String   @id @default(uuid())
+  name         String
+  email        String
+  whatsapp     String
+  access_token String   @unique
+  status       String   @default("pending")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@map("conversions")
 }

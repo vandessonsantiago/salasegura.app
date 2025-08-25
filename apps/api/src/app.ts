@@ -5,6 +5,8 @@ import cors from "cors";
 import routes from "./routes";
 import authRoutes from "./routes/auth";
 import protectedRoutes from "./routes/protected";
+import chatRoutes from "./routes/chat";
+import conversionsRoutes from "./routes/conversions";
 import { errorHandler } from "./middleware/errorHandler";
 const express = require('express');
 import { requestLogger } from "./middleware/requestLogger";
@@ -34,6 +36,12 @@ export const createApp = (): Express => {
 
   // Rotas protegidas
   app.use("/api/user", protectedRoutes);
+
+  // Rotas de chat
+  app.use("/api/chat", chatRoutes);
+
+  // Rotas de conversão (registro via chat)
+  app.use("/api/conversions", conversionsRoutes);
 
   // Rotas principais
   app.use("/api", routes);

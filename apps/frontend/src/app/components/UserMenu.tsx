@@ -1,16 +1,29 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SignOut, ShieldCheck } from 'phosphor-react';
+import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from './UserAvatar';
 
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const router = useRouter();
 
-  const user = {
-    email: 'user@example.com',
-    name: 'John Doe',
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
+
+  // Se não há usuário, não mostrar o menu
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="relative">
@@ -36,7 +49,7 @@ export default function UserMenu() {
 
           <div className="py-2">
             <button
-              
+              onClick={handleSignOut}
               className="flex items-center justify-end space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <SignOut size={16} weight="regular" />

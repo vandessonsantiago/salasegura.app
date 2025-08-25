@@ -1,4 +1,4 @@
-import Logo from "./Logo";
+import Logo from "@/components/Logo";
 import UserMenu from "./UserMenu";
 
 export default function Header() {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SignOut, ShieldCheck } from 'phosphor-react';
 import { useAuth } from '@/contexts/AuthContext';
-import UserAvatar from './UserAvatar';
+import UserAvatar from '../ui/UserAvatar';
 
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);

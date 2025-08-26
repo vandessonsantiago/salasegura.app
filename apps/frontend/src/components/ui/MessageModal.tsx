@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useChatStorage, ChatSession } from "../hooks/useChatStorage";
+import { useChatStorage, ChatSession } from "@/hooks/useChatStorage";
 
 interface MessageModalProps {
   isOpen: boolean;

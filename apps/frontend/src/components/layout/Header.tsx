@@ -10,6 +10,7 @@ interface HeaderProps {
   // Dashboard props  
   showUserMenu?: boolean;
   UserMenuComponent?: React.ComponentType;
+  onResetDashboard?: () => void; // Nova prop para resetar dashboard
   // Common props
   className?: string;
 }
@@ -19,6 +20,7 @@ export default function Header({
   onLoadSession, 
   showUserMenu = false,
   UserMenuComponent,
+  onResetDashboard,
   className = ""
 }: HeaderProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,6 +28,8 @@ export default function Header({
   const handleLogoClick = () => {
     if (onResetChat) {
       onResetChat();
+    } else if (onResetDashboard) {
+      onResetDashboard();
     }
   };
 
@@ -41,7 +45,7 @@ export default function Header({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              {onResetChat ? (
+              {(onResetChat || onResetDashboard) ? (
                 <button onClick={handleLogoClick} className="focus:outline-none">
                   <Logo />
                 </button>

@@ -27,6 +27,14 @@ export default function DashboardPage() {
     setFooterMessage(timestampedMessage);
   };
 
+  // Função para resetar o dashboard e voltar ao Hero
+  const handleResetDashboard = () => {
+    console.log('🔄 Dashboard: Resetando dashboard - voltando ao Hero');
+    if (mainRef.current) {
+      mainRef.current.resetChat();
+    }
+  };
+
   // Mostrar loading enquanto verifica autenticação
   if (loading) {
     return <Loading />;
@@ -42,12 +50,13 @@ export default function DashboardPage() {
       <Header 
         showUserMenu={true}
         UserMenuComponent={UserMenu}
+        onResetDashboard={handleResetDashboard}
       />
       <Main 
         ref={mainRef} 
         mode="dashboard"
         HeroComponent={Hero}
-        initialMessage={footerMessage}
+        triggerMessage={footerMessage}
         onNewMessage={() => {}}
       />
       <Footer 

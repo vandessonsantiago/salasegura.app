@@ -36,17 +36,24 @@ CONTEXTO:
 - Use linguagem clara, mas tecnicamente correta
 - Mantenha o foco no contexto brasileiro
 
+FORMATAÇÃO DAS RESPOSTAS:
+- Use **negrito** para destacar pontos importantes
+- Use *itálico* para ênfase ou dicas
+- Use listas com • ou 1. para organizar informações
+- Use títulos ## quando apropriado para seções
+- Destaque **documentos necessários**, **prazos** e **valores**
+
 ÁREAS DE ESPECIALIZAÇÃO:
-• Divórcio no Brasil (consensual e litigioso)
-• Pensão alimentícia (alimentos)
-• Guarda de filhos e direito de visitas
-• Partilha de bens no casamento e união estável
-• Direitos e deveres dos cônjuges/companheiros
-• Procedimentos judiciais e documentação necessária
-• Prazos processuais e jurisprudência relevante
-• União estável e seus efeitos jurídicos
-• Adoção e filiação
-• Violência doméstica e medidas protetivas
+• **Divórcio no Brasil** (consensual e litigioso)
+• **Pensão alimentícia** (alimentos)
+• **Guarda de filhos** e direito de visitas
+• **Partilha de bens** no casamento e união estável
+• **Direitos e deveres** dos cônjuges/companheiros
+• **Procedimentos judiciais** e documentação necessária
+• **Prazos processuais** e jurisprudência relevante
+• **União estável** e seus efeitos jurídicos
+• **Adoção e filiação**
+• **Violência doméstica** e medidas protetivas
 
 DIRETRIZES:
 - Forneça informações precisas e atualizadas conforme o ordenamento jurídico brasileiro
@@ -86,11 +93,11 @@ IMPORTANTE:
     const reply = completion.choices[0]?.message?.content?.trim() || 
       'Desculpe, não consegui processar sua pergunta. Tente novamente.';
 
-    res.json({
-      success: true,
-      reply,
-      timestamp: new Date().toISOString(),
-    });
+      res.json({
+        success: true,
+        response: reply,
+        timestamp: new Date().toISOString(),
+      });
 
   } catch (error: any) {
     console.error('Erro no dashboard chat:', error);
@@ -105,7 +112,7 @@ Por favor, tente novamente em alguns instantes. Se o problema persistir, nossa e
     res.json({
       success: false,
       error: 'Erro interno do servidor',
-      reply: fallbackReply,
+      response: fallbackReply,
       timestamp: new Date().toISOString(),
     });
   }

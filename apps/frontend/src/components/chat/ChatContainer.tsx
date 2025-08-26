@@ -7,16 +7,18 @@ import { MessageBlock, TypingAnimation, ThinkingAnimation } from '@/components/u
 
 interface ChatContainerProps {
   onChatStart?: (started: boolean) => void;
-  initialMessage?: string;
+  chatType?: 'juridico' | 'conversao';
+  triggerMessage?: string; // Nova prop para disparar mensagens
 }
 
 export interface ChatContainerRef {
   handleNewMessage: (message: string) => void;
   resetChat: () => void;
   loadSession: (session: ChatSession) => void;
+  startChat: (message: string) => void;
 }
 
-const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, initialMessage }, ref) => {
+const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, triggerMessage, chatType = 'conversao' }, ref) => {
   const [isChatStarted, setIsChatStarted] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
@@ -45,35 +47,59 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Notificar componente pai sobre mudança de estado
   useEffect(() => {
+    console.log('🔔 useEffect isChatStarted mudou:', isChatStarted);
     if (onChatStart) {
       onChatStart(isChatStarted);
     }
   }, [isChatStarted, onChatStart]);
 
-  // Processar mensagem inicial se fornecida
+  // Controle simples: quando triggerMessage muda, processa a mensagem
+  const lastTriggerRef = useRef<string>('');
   useEffect(() => {
-    if (initialMessage && initialMessage.trim() && !isChatStarted) {
-      handleStartChat(initialMessage);
+    if (triggerMessage && triggerMessage !== lastTriggerRef.current) {
+      lastTriggerRef.current = triggerMessage;
+      const cleanMessage = triggerMessage.includes('|') ? triggerMessage.split('|')[0] : triggerMessage;
+      
+      console.log('🎯 Nova triggerMessage:', { triggerMessage, cleanMessage, isChatStarted });
+      
+      if (!isChatStarted) {
+        console.log('🚀 Iniciando chat com:', cleanMessage);
+        handleStartChat(cleanMessage);
+      } else {
+        console.log('💬 Enviando nova mensagem:', cleanMessage);
+        handleNewMessage(cleanMessage);
+      }
     }
-  }, [initialMessage, isChatStarted]);
+  }, [triggerMessage]);
 
   // Função para lidar com o término da animação de digitação
+  // Fallback para garantir renderização da resposta
   const handleTypingComplete = () => {
     console.log('🎬 handleTypingComplete chamado');
     console.log('📝 pendingMessage:', pendingMessage);
-    
     if (pendingMessage) {
       const updatedMessages = [...chatMessages, pendingMessage];
       setChatMessages(updatedMessages);
       setPendingMessage(null);
       setIsTyping(false);
-      
       // Salvar sessão atualizada
       if (currentSessionId) {
         updateSession(currentSessionId, updatedMessages);
       }
     }
   };
+
+  // Fallback: se animação não terminar em 30s, força renderização
+  useEffect(() => {
+    if (isTyping && pendingMessage) {
+      const timeout = setTimeout(() => {
+        if (isTyping && pendingMessage) {
+          handleTypingComplete();
+        }
+      }, 30000); // 30 segundos
+      return () => clearTimeout(timeout);
+    }
+  }, [isTyping, pendingMessage]);
 
   const handleTypingProgress = () => {
     scrollToBottom();
@@ -143,112 +169,116 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   const handleStartChat = async (message: string) => {
     console.log('🚀 Iniciando chat com mensagem:', message);
+    console.log('🔄 Estado atual isChatStarted:', isChatStarted);
     setIsChatStarted(true);
-    
+    console.log('✅ setIsChatStarted(true) chamado');
+    if (onChatStart) {
+      onChatStart(true);
+    }
     // Criar nova sessão
     const sessionId = createSession(message);
     setCurrentSessionId(sessionId);
-    
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
       content: message,
       timestamp: new Date()
     };
-    
-    // Adicionar mensagem do usuário imediatamente
     setChatMessages([userMessage]);
     setIsThinking(true);
-    
+    console.log('📝 Estados iniciais definidos, iniciando API call...');
     try {
       console.log('🤖 Chamando API real...');
+      let response;
+      if (chatType === 'juridico') {
+        const { DashboardChatService } = await import('@/services/dashboardChatService');
+        response = await DashboardChatService.sendMessage(message, []);
+      } else {
+        response = await ChatService.sendMessage(message, []);
+      }
+      console.log('📦 Resposta completa da API:', response);
+      console.log('📝 Campo response:', response.response);
+      console.log('📊 Tipo do response:', typeof response.response);
       
-      // Chamar API real
-      const response = await ChatService.sendMessage(message, []);
-      
-      const assistantMessage: ChatMessage = {
+      let assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: response.response,
-        timestamp: new Date(),
-        conversionData: response.conversionData || undefined
+        timestamp: new Date()
       };
+      console.log('💬 Mensagem do assistente criada:', assistantMessage);
       
-      // Armazenar a mensagem temporariamente para usar na animação
+      if (chatType === 'conversao' && 'conversionData' in response) {
+        assistantMessage = {
+          ...assistantMessage,
+          conversionData: (response as any).conversionData
+        };
+      }
+      console.log('🔄 Definindo pendingMessage...');
       setPendingMessage(assistantMessage);
-      
-      // Transição: parar pensamento e iniciar digitação
       setIsThinking(false);
       setIsTyping(true);
-      
+      console.log('✅ Estados atualizados: isThinking=false, isTyping=true');
     } catch (error) {
       console.error('Erro ao processar mensagem:', error);
       setIsThinking(false);
-      
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
         timestamp: new Date()
       };
-      
       setChatMessages(prev => [...prev, errorMessage]);
     }
   };
 
   const handleNewMessage = async (message: string) => {
-    if (!message.trim() || !currentSessionId) return;
-
-    console.log('💬 Nova mensagem:', message);
-
+    const cleanMessage = message.includes('|') ? message.split('|')[0] : message;
+    if (!cleanMessage.trim() || !currentSessionId) return;
+    console.log('💬 Nova mensagem:', cleanMessage);
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: message,
+      content: cleanMessage,
       timestamp: new Date()
     };
-
     const updatedMessages = [...chatMessages, userMessage];
     setChatMessages(updatedMessages);
-
-    // Salvar sessão atualizada
     updateSession(currentSessionId, updatedMessages);
-
-    // Iniciar animação de pensamento
     setIsThinking(true);
-
     try {
       console.log('🤖 Chamando API real para nova mensagem...');
-      
-      // Chamar API real com histórico completo
-      const response = await ChatService.sendMessage(message, chatMessages);
-      
-      const assistantMessage: ChatMessage = {
+      let response;
+      if (chatType === 'juridico') {
+        const { DashboardChatService } = await import('@/services/dashboardChatService');
+        response = await DashboardChatService.sendMessage(message, chatMessages);
+      } else {
+        response = await ChatService.sendMessage(message, chatMessages);
+      }
+      let assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: response.response,
-        timestamp: new Date(),
-        conversionData: response.conversionData || undefined
+        timestamp: new Date()
       };
-      
-      // Armazenar a mensagem temporariamente para usar na animação
+      if (chatType === 'conversao' && 'conversionData' in response) {
+        assistantMessage = {
+          ...assistantMessage,
+          conversionData: (response as any).conversionData
+        };
+      }
       setPendingMessage(assistantMessage);
-      
-      // Transição: parar pensamento e iniciar digitação
       setIsThinking(false);
       setIsTyping(true);
-      
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       setIsThinking(false);
-      
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
         timestamp: new Date()
       };
-      
       setChatMessages(prev => [...prev, errorMessage]);
     }
   };
@@ -260,9 +290,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     setIsTyping(false);
     setPendingMessage(null);
     setCurrentSessionId(null);
-  };
-
-  const resetChat = () => {
+  };  const resetChat = () => {
     handleRestartChat();
   };
 
@@ -276,14 +304,16 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     setPendingMessage(null);
   };
 
-  // Expor handleNewMessage, resetChat e loadSession via ref
+  // Expor handleNewMessage, resetChat, loadSession e startChat via ref
   useImperativeHandle(ref, () => ({
     handleNewMessage,
     resetChat,
-    loadSession
+    loadSession,
+    startChat: handleStartChat
   }));
 
   if (!isChatStarted) {
+    console.log('❌ Chat não iniciado, exibindo div vazio');
     // Estado inicial - Vazio
     return (
       <div className="flex-1">
@@ -291,6 +321,13 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       </div>
     );
   }
+
+  console.log('✅ Chat iniciado, renderizando interface:', { 
+    chatMessagesLength: chatMessages.length, 
+    isThinking, 
+    isTyping, 
+    hasPendingMessage: !!pendingMessage 
+  });
 
   // Estado do chat ativo - Exibir mensagens
   return (
@@ -325,7 +362,16 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
           {isThinking && <ThinkingAnimation />}
 
           {/* Animação de digitação */}
-          {isTyping && pendingMessage && (
+          {(() => {
+            console.log('🔍 Verificando condições para TypingAnimation:', {
+              isTyping,
+              pendingMessage: !!pendingMessage,
+              pendingMessageType: typeof pendingMessage?.content,
+              pendingMessageContent: pendingMessage?.content?.substring(0, 50) + '...',
+              contentTrim: pendingMessage?.content?.trim()?.length
+            });
+            return isTyping && pendingMessage && typeof pendingMessage.content === 'string' && pendingMessage.content.trim();
+          })() && pendingMessage && (
             <div className="flex gap-3 mb-4 justify-start">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">

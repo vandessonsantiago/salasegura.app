@@ -67,7 +67,7 @@ export default function LandingPage() {
       <Main 
         ref={mainRef}
         mode="landing"
-        initialMessage={footerMessage}
+        triggerMessage={footerMessage}
         onNewMessage={() => {}}
       />
       <Footer 

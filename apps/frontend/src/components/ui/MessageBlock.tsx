@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { ChatMessage } from '@/hooks/useChatStorage';
-import ContactFormMessage from './ContactFormMessage';
+import ReactMarkdown from 'react-markdown';
+import ContactFormMessage from '../forms/ContactFormMessage';
 
 interface MessageBlockProps {
   message: ChatMessage;
@@ -123,7 +124,58 @@ export default function MessageBlock({
             </div>
           </div>
         ) : (
-          <div className="whitespace-pre-line">{message.content}</div>
+          <div className="whitespace-pre-line">
+            {message.type === 'assistant' ? (
+              <ReactMarkdown
+                components={{
+                  // Parágrafos com espaçamento reduzido
+                  // Parágrafos sem espaçamento
+                  p: ({node, ...props}) => <p className="mb-0 leading-relaxed" {...props} />,
+                  
+                  // Texto em negrito
+                  strong: ({node, ...props}) => <strong className="font-bold text-gray-900" {...props} />,
+                  
+                  // Texto em itálico
+                  em: ({node, ...props}) => <em className="italic text-gray-700" {...props} />,
+                  
+                  // Listas sem espaçamento
+                  ul: ({node, ...props}) => <ul className="mb-0 space-y-0" {...props} />,
+                  
+                  // Listas ordenadas sem espaçamento
+                  ol: ({node, ...props}) => <ol className="mb-0 space-y-0" {...props} />,
+                  
+                  // Items de lista sem espaçamento
+                  li: ({node, ...props}) => <li className="mb-0" {...props} />,
+                  
+                  // Links
+                  a: ({node, ...props}) => (
+                    <a 
+                      className="text-teal-600 hover:text-teal-800 underline font-medium" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      {...props} 
+                    />
+                  ),
+                  
+                  // Títulos sem espaçamento
+                  h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-0 mt-0" {...props} />,
+                  h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-0 mt-0" {...props} />,
+                  h3: ({node, ...props}) => <h3 className="text-base font-bold mb-0 mt-0" {...props} />,
+                  h4: ({node, ...props}) => <h4 className="text-sm font-bold mb-0 mt-0" {...props} />,                  // Código inline
+                  code: ({node, ...props}) => (
+                    <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-gray-800" {...props} />
+                  ),
+                  
+                  // Blocos de código
+                  pre: ({node, ...props}) => (
+                    <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto mb-2" {...props} />
+                  )
+                }}
+              >{message.content}</ReactMarkdown>
+            ) : (
+              message.content
+            )}
+          </div>
         )}
 
         {/* Timestamp */}

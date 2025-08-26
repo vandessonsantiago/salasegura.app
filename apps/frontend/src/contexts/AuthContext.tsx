@@ -44,7 +44,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Limpar dados locais primeiro
+      localStorage.removeItem('consultasAgendadas');
+      
+      // Fazer logout no Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Erro ao fazer logout:', error);
+        throw error;
+      }
+      
+      // Limpar cookies manualmente se necessário
+      if (typeof window !== 'undefined') {
+        // Limpar cookies do Supabase
+        document.cookie = 'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie = 'sb-refresh-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie = 'sb-localhost-auth-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        
+        // Forçar recarregamento da página
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error('Erro durante logout:', error);
+      // Mesmo com erro, limpar dados locais e redirecionar
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        window.location.href = '/login';
+      }
+    }
   };
 
   return (

@@ -31,3 +31,21 @@ export async function authJsonFetch(path: string, token: string, init?: RequestI
   }
   return res.json();
 }
+
+// API object with fetch method for consistent usage
+export const api = {
+  async fetch(path: string, init?: RequestInit) {
+    const res = await fetch(apiEndpoint(path), {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers || {})
+      }
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    return res.json();
+  }
+};

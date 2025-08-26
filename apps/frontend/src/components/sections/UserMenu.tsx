@@ -13,8 +13,9 @@ export default function UserMenu() {
 
   const handleSignOut = async () => {
     try {
+      setIsOpen(false); // Fechar o menu antes do logout
       await signOut();
-      router.push('/login');
+      // O redirecionamento agora é feito pelo AuthContext
     } catch (error) {
       console.error('Error signing out:', error);
     }

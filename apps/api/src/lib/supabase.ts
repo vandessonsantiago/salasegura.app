@@ -25,6 +25,12 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey, {
   global: {
     headers: {
       'Authorization': `Bearer ${supabaseSecretKey}`,
+      'apikey': supabaseSecretKey,
+    },
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
     },
   },
 });

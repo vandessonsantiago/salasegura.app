@@ -19,6 +19,7 @@ model User {
   profile    UserProfile?
   sessions   UserSession[]
   checklistSessions ChecklistSession[]
+  agendamentos Agendamento[]
 
   @@map("users")
 }
@@ -123,4 +124,34 @@ model ChecklistItem {
   @@unique([session_id, item_id])
   @@index([session_id])
   @@map("checklist_items")
+}
+
+// -------------------------------------------------------------
+// Agendamentos
+// -------------------------------------------------------------
+model Agendamento {
+  id                 String   @id @default(uuid())
+  user_id           String
+  data              String   // Data no formato YYYY-MM-DD
+  horario           String   // Horário no formato HH:mm
+  status            String   @default("PENDING")
+  payment_id        String
+  payment_status    String   @default("PENDING")
+  valor             Float
+  descricao         String
+  cliente_nome      String
+  cliente_email     String
+  cliente_telefone  String
+  qr_code_pix       String?
+  copy_paste_pix    String?
+  pix_expires_at    String?
+  calendar_event_id String?
+  google_meet_link  String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([data, horario])
+  @@map("agendamentos")
 }

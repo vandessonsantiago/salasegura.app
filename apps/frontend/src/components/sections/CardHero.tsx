@@ -12,6 +12,10 @@ interface CardHeroProps {
     text: string;
     variant: 'free' | 'premium';
   };
+  status?: {
+    text: string;
+    variant: 'pending' | 'confirmed' | 'cancelled' | 'expired';
+  };
   progress?: {
     current: number;
     total: number;
@@ -31,6 +35,7 @@ export default function CardHero({
   description,
   price,
   badge,
+  status,
   progress,
   button,
   highlight = false
@@ -63,7 +68,7 @@ export default function CardHero({
 
       {/* Price and Button in same line */}
       <div className="flex items-center justify-between mt-auto">
-        {/* Price, Badge or Progress */}
+        {/* Price, Badge, Status or Progress */}
         <div>
           {progress?.show ? (
             <div className="flex items-center gap-2">
@@ -74,6 +79,20 @@ export default function CardHero({
                 {Math.round((progress.current / progress.total) * 100)}%
               </span>
             </div>
+          ) : status ? (
+            <span className={`
+              px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide
+              ${status.variant === 'pending' 
+                ? 'bg-yellow-100 text-yellow-700' 
+                : status.variant === 'confirmed'
+                ? 'bg-green-100 text-green-700'
+                : status.variant === 'cancelled'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-gray-100 text-gray-700'
+              }
+            `}>
+              {status.text}
+            </span>
           ) : badge ? (
             <span className={`
               px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide

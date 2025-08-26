@@ -1,17 +1,23 @@
-import { CheckSquare, Users, Calendar, SignIn } from 'phosphor-react';
+import { CheckSquare, Users, CalendarIcon, SignIn } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import CardHero from './CardHero';
 import dynamic from 'next/dynamic';
 import { useChecklist } from '@/contexts/ChecklistContext';
+import { useAgendamentos } from '@/contexts/AgendamentosContext';
 
-// Carregar modal dinamicamente (evita SSR issues com window)
+// Carregar modais dinamicamente (evita SSR issues com window)
 const ChecklistModal = dynamic(() => import('@/components/modals/ChecklistModal'), { ssr: false });
+const AgendamentoModal = dynamic(() => import('@/components/modals/AgendamentoModal'), { ssr: false });
+const MeusAgendamentosModal = dynamic(() => import('@/components/modals/MeusAgendamentosModal'), { ssr: false });
 
 export default function Hero() {
   const router = useRouter();
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showAgendamento, setShowAgendamento] = useState(false);
+  const [showMeusAgendamentos, setShowMeusAgendamentos] = useState(false);
   const { sessions, currentSession } = useChecklist();
+  const { hasConsultas, getLatestConsulta, formatStatus, formatDate } = useAgendamentos();
 
   const handleLogin = () => {
     router.push('/login');
@@ -24,6 +30,10 @@ export default function Hero() {
   const activeSession = sessions.find(session => !session.completed_at) || currentSession;
   const hasProgress = activeSession && activeSession.total_items > 0 && activeSession.progress > 0;
   const isCompleted = activeSession && activeSession.total_items > 0 && activeSession.progress === activeSession.total_items;
+
+  // Informações do último agendamento
+  const latestConsulta = getLatestConsulta();
+  const consultaStatus = latestConsulta ? formatStatus(latestConsulta.status) : null;
 
   return (
     <section className="py-4 w-full">
@@ -69,25 +79,59 @@ export default function Hero() {
               highlight={true}
             />
 
-            {/* Card 3 - Consulta */}
-            <CardHero
-              icon={<Calendar size={22} />}
-              title="Agendar Consulta de Alinhamento Inicial"
-              price={{
-                original: "R$ 759,00",
-                current: "R$ 99,00"
-              }}
-              button={{
-                text: "AGENDAR CONSULTA",
-                variant: "primary",
-                onClick: () => console.log('Consulta clicked')
-              }}
-            />
+            {/* Card 3 - Consulta (só aparece se NÃO tiver agendamentos) */}
+            {!hasConsultas && (
+              <CardHero
+                icon={<CalendarIcon size={22} />}
+                title="Agendar Consulta de Alinhamento Inicial"
+                price={{
+                  original: "R$ 759,00",
+                  current: "R$ 99,00"
+                }}
+                button={{
+                  text: "AGENDAR CONSULTA",
+                  variant: "primary",
+                  onClick: () => setShowAgendamento(true)
+                }}
+              />
+            )}
+
+            {/* Card 3 - Meus Agendamentos (só aparece se TIVER agendamentos) */}
+            {hasConsultas && latestConsulta && (
+              <CardHero
+                icon={<CalendarIcon size={22} />}
+                title={`Próxima Consulta - ${formatDate(latestConsulta.data)} às ${latestConsulta.horario}`}
+                description={latestConsulta.descricao}
+                status={consultaStatus || undefined}
+                button={{
+                  text: "VER AGENDAMENTOS",
+                  variant: "secondary",
+                  onClick: () => setShowMeusAgendamentos(true)
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
       {showChecklist && (
         <ChecklistModal isOpen={showChecklist} onClose={() => setShowChecklist(false)} />
+      )}
+      {showAgendamento && (
+        <AgendamentoModal 
+          isOpen={showAgendamento} 
+          onClose={() => setShowAgendamento(false)} 
+          onAgendar={() => {}}
+        />
+      )}
+      {showMeusAgendamentos && (
+        <MeusAgendamentosModal 
+          isOpen={showMeusAgendamentos} 
+          onClose={() => setShowMeusAgendamentos(false)}
+          onAlterarAgendamento={() => {
+            setShowMeusAgendamentos(false);
+            setShowAgendamento(true);
+          }}
+        />
       )}
     </section>
   );

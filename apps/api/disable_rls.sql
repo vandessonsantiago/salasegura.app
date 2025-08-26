@@ -1,9 +1,8 @@
--- Desabilitar RLS temporariamente para a tabela conversions
--- Isso permite acesso total com Service Role Key
+-- SQL para desabilitar RLS
+ALTER TABLE public.agendamentos DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversions DISABLE ROW LEVEL SECURITY;
 
-ALTER TABLE conversions DISABLE ROW LEVEL SECURITY;
-
--- OU se quiser manter RLS, criar uma política que permite tudo para service role:
--- CREATE POLICY "Service role can do everything" ON conversions
--- FOR ALL USING (true)
--- WITH CHECK (true);
+-- Verificar se funcionou
+SELECT schemaname, tablename, rowsecurity 
+FROM pg_tables 
+WHERE tablename IN ('agendamentos', 'conversions');

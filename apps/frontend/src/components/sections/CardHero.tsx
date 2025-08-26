@@ -12,9 +12,14 @@ interface CardHeroProps {
     text: string;
     variant: 'free' | 'premium';
   };
+  progress?: {
+    current: number;
+    total: number;
+    show: boolean;
+  };
   button: {
     text: string;
-    variant: 'primary' | 'secondary';
+    variant: 'primary' | 'secondary' | 'free';
     onClick: () => void;
   };
   highlight?: boolean;
@@ -26,17 +31,28 @@ export default function CardHero({
   description,
   price,
   badge,
+  progress,
   button,
   highlight = false
 }: CardHeroProps) {
   return (
     <div className={`
-      rounded-xl p-4 sm:p-5 border-2 transition-all duration-200 hover:shadow-md h-24 sm:h-28 flex flex-col justify-between
+      rounded-xl p-4 sm:p-5 border-2 transition-all duration-200 hover:shadow-md h-24 sm:h-28 flex flex-col justify-between relative overflow-hidden
       ${highlight 
         ? 'border-teal-300 bg-teal-50 shadow-sm' 
         : 'border-gray-200 bg-white'
       }
     `}>
+      {/* Barra de progresso discreta no topo */}
+      {progress?.show && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100">
+          <div 
+            className="h-full bg-green-500 transition-all duration-300 ease-out"
+            style={{ width: `${Math.min((progress.current / progress.total) * 100, 100)}%` }}
+          />
+        </div>
+      )}
+
       {/* Header with Icon and Title */}
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="text-lg sm:text-xl flex-shrink-0 text-gray-600">{icon}</div>
@@ -47,9 +63,18 @@ export default function CardHero({
 
       {/* Price and Button in same line */}
       <div className="flex items-center justify-between mt-auto">
-        {/* Price or Badge */}
+        {/* Price, Badge or Progress */}
         <div>
-          {badge ? (
+          {progress?.show ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-green-600 font-medium">
+                {progress.current}/{progress.total}
+              </span>
+              <span className="text-xs text-gray-500">
+                {Math.round((progress.current / progress.total) * 100)}%
+              </span>
+            </div>
+          ) : badge ? (
             <span className={`
               px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide
               ${badge.variant === 'free' 
@@ -80,6 +105,8 @@ export default function CardHero({
             py-1.5 sm:py-2 px-3 sm:px-5 rounded-full font-medium text-xs transition-colors duration-200 whitespace-nowrap min-w-[110px] sm:min-w-[130px] shadow-sm
             ${button.variant === 'primary'
               ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : button.variant === 'free'
+              ? 'bg-green-600 hover:bg-green-700 text-white'
               : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
             }
           `}

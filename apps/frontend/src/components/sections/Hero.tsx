@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import CardHero from './CardHero';
 import dynamic from 'next/dynamic';
+import { useChecklist } from '@/contexts/ChecklistContext';
 
 // Carregar modal dinamicamente (evita SSR issues com window)
 const ChecklistModal = dynamic(() => import('@/components/modals/ChecklistModal'), { ssr: false });
@@ -10,10 +11,19 @@ const ChecklistModal = dynamic(() => import('@/components/modals/ChecklistModal'
 export default function Hero() {
   const router = useRouter();
   const [showChecklist, setShowChecklist] = useState(false);
+  const { sessions, currentSession } = useChecklist();
 
   const handleLogin = () => {
     router.push('/login');
   };
+
+  // Lógica do progresso do checklist:
+  // - activeSession: sessão que não foi completada (sem completed_at)
+  // - hasProgress: somente quando há progresso real (progress > 0)
+  // - isCompleted: quando progress == total_items
+  const activeSession = sessions.find(session => !session.completed_at) || currentSession;
+  const hasProgress = activeSession && activeSession.total_items > 0 && activeSession.progress > 0;
+  const isCompleted = activeSession && activeSession.total_items > 0 && activeSession.progress === activeSession.total_items;
 
   return (
     <section className="py-4 w-full">
@@ -30,10 +40,15 @@ export default function Hero() {
             <CardHero
               icon={<CheckSquare size={22} />}
               title='Checklist "Você está pronto(a) para o cartório?"'
-              badge={{ text: 'GRATUITO', variant: 'free' }}
+              badge={!hasProgress ? { text: 'GRATUITO', variant: 'free' } : undefined}
+              progress={hasProgress ? {
+                current: activeSession?.progress || 0,
+                total: activeSession?.total_items || 0,
+                show: true
+              } : undefined}
               button={{
-                text: 'ACESSAR AGORA',
-                variant: 'secondary',
+                text: isCompleted ? 'REVISAR' : hasProgress ? 'CONTINUAR' : 'ACESSAR AGORA',
+                variant: 'free',
                 onClick: () => setShowChecklist(true)
               }}
             />

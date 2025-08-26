@@ -18,6 +18,7 @@ model User {
   phone      String?
   profile    UserProfile?
   sessions   UserSession[]
+  checklistSessions ChecklistSession[]
 
   @@map("users")
 }
@@ -86,4 +87,40 @@ model Conversion {
   updated_at   DateTime @updatedAt
 
   @@map("conversions")
+}
+
+// -------------------------------------------------------------
+// Checklist Session & Items
+// -------------------------------------------------------------
+model ChecklistSession {
+  id           String           @id @default(uuid())
+  user_id      String
+  title        String
+  progress     Int              @default(0)
+  total_items  Int              @default(0)
+  template_version Int          @default(1)
+  completed_at DateTime?
+  created_at   DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
+  items        ChecklistItem[]
+  user         User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("checklist_sessions")
+}
+
+model ChecklistItem {
+  id         String           @id @default(uuid())
+  session_id String
+  item_id    String           // Identificador lógico "1.1" etc.
+  category   String
+  text       String
+  checked    Boolean          @default(false)
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+  session    ChecklistSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, item_id])
+  @@index([session_id])
+  @@map("checklist_items")
 }

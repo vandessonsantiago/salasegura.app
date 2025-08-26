@@ -1,9 +1,15 @@
 import { CheckSquare, Users, Calendar, SignIn } from 'phosphor-react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import CardHero from './CardHero';
+import dynamic from 'next/dynamic';
+
+// Carregar modal dinamicamente (evita SSR issues com window)
+const ChecklistModal = dynamic(() => import('@/components/modals/ChecklistModal'), { ssr: false });
 
 export default function Hero() {
   const router = useRouter();
+  const [showChecklist, setShowChecklist] = useState(false);
 
   const handleLogin = () => {
     router.push('/login');
@@ -24,14 +30,11 @@ export default function Hero() {
             <CardHero
               icon={<CheckSquare size={22} />}
               title='Checklist "Você está pronto(a) para o cartório?"'
-              badge={{
-                text: "GRATUITO",
-                variant: "free"
-              }}
+              badge={{ text: 'GRATUITO', variant: 'free' }}
               button={{
-                text: "ACESSAR AGORA",
-                variant: "secondary",
-                onClick: () => console.log('Checklist clicked')
+                text: 'ACESSAR AGORA',
+                variant: 'secondary',
+                onClick: () => setShowChecklist(true)
               }}
             />
 
@@ -68,6 +71,9 @@ export default function Hero() {
           </div>
         </div>
       </div>
+      {showChecklist && (
+        <ChecklistModal isOpen={showChecklist} onClose={() => setShowChecklist(false)} />
+      )}
     </section>
   );
 }

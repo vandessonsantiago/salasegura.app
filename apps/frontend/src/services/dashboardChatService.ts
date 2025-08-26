@@ -14,7 +14,11 @@ interface DashboardChatResponse {
   };
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
+// Versão da API: v1
+// Dashboard chat usa mesma API base; ajustar para 3001 a não ser que exista segundo servidor.
+import { apiEndpoint } from '@/lib/api';
+
+const DASHBOARD_CHAT_ENDPOINT = apiEndpoint('/dashboard-chat');
 
 export class DashboardChatService {
   static async sendMessage(message: string, chatHistory: DashboardChatMessage[]): Promise<DashboardChatResponse> {
@@ -38,7 +42,8 @@ export class DashboardChatService {
         historyLength: formattedHistory.length
       });
 
-      const response = await fetch(`${API_BASE_URL}/dashboard-chat`, {
+  // Backend expõe rota POST /api/v1/dashboard-chat
+  const response = await fetch(DASHBOARD_CHAT_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

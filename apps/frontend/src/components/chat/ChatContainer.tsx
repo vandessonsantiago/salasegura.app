@@ -108,8 +108,8 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   // Função para lidar com submissão do formulário de contato
   const handleContactFormSubmit = async (contactData: { name: string; email: string; whatsapp: string }) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const response = await fetch(`${apiUrl}/conversions`, {
+  const { apiEndpoint } = await import('@/lib/api');
+  const response = await fetch(apiEndpoint('/conversions'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
+import { UserService } from '../services/UserService';
 
 export const authenticateToken = async (
   req: Request,
@@ -23,7 +24,21 @@ export const authenticateToken = async (
       return;
     }
 
-    // Adicionar user ao request
+    // Garantir que o usuário exista na base local (para FKs)
+    try {
+      await UserService.upsertUser({
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name,
+        avatar_url: user.user_metadata?.avatar_url,
+        phone: user.phone || undefined,
+      });
+    } catch (e) {
+      console.error('[Auth] Falha ao upsert user local', e);
+      // Prosseguir mesmo assim; se falhar, rotas com FK vão quebrar e facilitar debug
+    }
+
+    // Adicionar user ao request (payload simplificado)
     req.user = {
       id: user.id,
       email: user.email!,

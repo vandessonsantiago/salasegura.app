@@ -8,6 +8,7 @@ import protectedRoutes from "./routes/protected";
 import chatRoutes from "./routes/chat";
 import conversionsRoutes from "./routes/conversions";
 import dashboardChatRoutes from "./routes/dashboardChat";
+import checklistRoutes from "./routes/checklist";
 import { errorHandler } from "./middleware/errorHandler";
 const express = require('express');
 import { requestLogger } from "./middleware/requestLogger";
@@ -32,23 +33,28 @@ export const createApp = (): Express => {
   // Middleware customizado de logging
   app.use(requestLogger);
 
-  // Rotas de autenticação
+  // ------------------------------------------------------------------
+  // Rotas (LEGADO) sem versão - manter temporariamente para compatibilidade
+  // ------------------------------------------------------------------
   app.use("/api/auth", authRoutes);
-
-  // Rotas protegidas
   app.use("/api/user", protectedRoutes);
-
-  // Rotas de chat
   app.use("/api/chat", chatRoutes);
-
-  // Rotas de chat do dashboard (divórcio/direito família)
   app.use("/api/dashboard-chat", dashboardChatRoutes);
-
-  // Rotas de conversão (registro via chat)
   app.use("/api/conversions", conversionsRoutes);
-
-  // Rotas principais
+  app.use("/api/checklist", checklistRoutes);
   app.use("/api", routes);
+
+  // ------------------------------------------------------------------
+  // Rotas versão 1 (novo padrão): /api/v1/*
+  // Mantém mesma instância de handlers para não duplicar lógica
+  // ------------------------------------------------------------------
+  app.use("/api/v1/auth", authRoutes);
+  app.use("/api/v1/user", protectedRoutes);
+  app.use("/api/v1/chat", chatRoutes);
+  app.use("/api/v1/dashboard-chat", dashboardChatRoutes);
+  app.use("/api/v1/conversions", conversionsRoutes);
+  app.use("/api/v1/checklist", checklistRoutes);
+  app.use("/api/v1", routes); // inclui /health, /message, etc.
 
   // Rotas de compatibilidade (mantendo as antigas rotas no root)
   app.get("/status", (req: Request, res: Response) => res.redirect("/api/health/status"));

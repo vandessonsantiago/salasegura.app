@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { apiEndpoint } from '@/lib/api';
 
 export interface DashboardChatMessage {
   id: string;
@@ -30,7 +31,7 @@ export function useDashboardChat() {
     setIsThinking(true);
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const dashboardChatUrl = apiEndpoint('/dashboard-chat');
       
       // Obter token da sessão do Supabase
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,7 +47,7 @@ export function useDashboardChat() {
         content: msg.content
       }));
 
-      const response = await fetch(`${apiUrl}/dashboard-chat`, {
+  const response = await fetch(dashboardChatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -24,14 +24,17 @@ interface ChatResponse {
   conversionData: ConversionData | null;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+// Versão da API: v1
+import { apiEndpoint } from '@/lib/api';
+const CHAT_ENDPOINT = apiEndpoint('/chat');
 
 export class ChatService {
   static async sendMessage(message: string, chatHistory: ChatMessage[]): Promise<ChatResponse> {
     try {
       console.log('🚀 Enviando mensagem para API:', { message, historyLength: chatHistory.length });
       
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+  // Backend expõe rota POST /api/v1/chat
+  const response = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,7 +69,7 @@ export class ChatService {
 
   static async getStatus(): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/chat`);
+  const response = await fetch(CHAT_ENDPOINT);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

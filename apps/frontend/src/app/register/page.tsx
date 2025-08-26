@@ -36,8 +36,8 @@ function RegisterContent() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const response = await fetch(`${apiUrl}/conversions/${token}`);
+  const { apiEndpoint } = await import('@/lib/api');
+  const response = await fetch(apiEndpoint(`/conversions/${token}`));
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -79,8 +79,8 @@ function RegisterContent() {
 
     try {
       // Criar usuário via API (usando Service Role Key - sem verificação de email)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const signupResponse = await fetch(`${apiUrl}/conversions/${token}/signup`, {
+  const { apiEndpoint } = await import('@/lib/api');
+  const signupResponse = await fetch(apiEndpoint(`/conversions/${token}/signup`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

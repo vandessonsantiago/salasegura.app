@@ -27,6 +27,7 @@ interface CardHeroProps {
     onClick: () => void;
   };
   highlight?: boolean;
+  customContent?: ReactNode;
 }
 
 export default function CardHero({
@@ -38,7 +39,8 @@ export default function CardHero({
   status,
   progress,
   button,
-  highlight = false
+  highlight = false,
+  customContent
 }: CardHeroProps) {
   return (
     <div className={`
@@ -59,15 +61,16 @@ export default function CardHero({
       )}
 
       {/* Header with Icon and Title */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1 sm:gap-3">
         <div className="text-lg sm:text-xl flex-shrink-0 text-gray-600">{icon}</div>
         <h3 className="text-xs sm:text-sm font-semibold text-gray-900 leading-tight flex-1 truncate">
           {title}
         </h3>
       </div>
 
+      
       {/* Price and Button in same line */}
-      <div className="flex items-center justify-between mt-auto">
+      <div className="relative flex items-center justify-between mt-auto">
         {/* Price, Badge, Status or Progress */}
         <div>
           {progress?.show ? (
@@ -117,6 +120,7 @@ export default function CardHero({
           )}
         </div>
 
+       
         {/* Button */}
         <button
           onClick={button.onClick}
@@ -134,5 +138,6 @@ export default function CardHero({
         </button>
       </div>
     </div>
+    
   );
 }

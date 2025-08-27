@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { updatePaymentStatus } from '../services/PaymentService';
+import { createCalendarEvent } from '../services/google-calendar';
 
 const router: Router = Router();
 
@@ -73,6 +74,69 @@ router.post('/', async (req: Request, res: Response) => {
         console.error('❌ Erro ao atualizar status do agendamento:', agendamentoError);
       } else {
         console.log(`✅ Agendamento ${paymentRecord.agendamento_id} atualizado para ${agendamentoStatus}`);
+
+        // Se o agendamento foi confirmado, criar evento no Google Calendar
+        if (agendamentoStatus === 'CONFIRMED') {
+          try {
+            // Buscar dados do agendamento para criar o evento
+            const { data: agendamento, error: agendamentoFetchError } = await supabaseAdmin
+              .from('agendamentos')
+              .select('*')
+              .eq('id', paymentRecord.agendamento_id)
+              .single();
+
+            if (agendamentoFetchError) {
+              console.error('❌ Erro ao buscar dados do agendamento para criar evento:', agendamentoFetchError);
+            } else if (agendamento) {
+              console.log(`📅 Criando evento no Google Calendar para agendamento ${paymentRecord.agendamento_id}`);
+
+              // Criar evento no Google Calendar
+              const { eventId, meetLink } = await createCalendarEvent({
+                date: agendamento.data,
+                time: agendamento.horario,
+                summary: `Consulta - ${agendamento.cliente_nome}`,
+                description: agendamento.descricao || 'Consulta de alinhamento inicial',
+                attendees: [agendamento.cliente_email],
+                durationMinutes: 45
+              });
+
+              console.log(`🔍 Debug Google Calendar:`, {
+                eventId,
+                meetLink,
+                hasEventId: !!eventId,
+                hasMeetLink: !!meetLink,
+                meetLinkLength: meetLink?.length,
+                isEmptyString: meetLink === "",
+                agendamentoId: paymentRecord.agendamento_id
+              });
+
+              // Atualizar agendamento com o eventId e meetLink
+              if (eventId || meetLink) {
+                const updateData: any = { updated_at: new Date().toISOString() };
+                if (eventId) updateData.calendar_event_id = eventId;
+                // Sempre tentar salvar o meetLink, mesmo que seja vazio (para indicar que tentamos gerar)
+                if (meetLink !== undefined) updateData.google_meet_link = meetLink;
+
+                const { error: updateError } = await supabaseAdmin
+                  .from('agendamentos')
+                  .update(updateData)
+                  .eq('id', paymentRecord.agendamento_id);
+
+                if (updateError) {
+                  console.error('❌ Erro ao atualizar agendamento com dados do Google Calendar:', updateError);
+                } else {
+                  console.log(`✅ Agendamento ${paymentRecord.agendamento_id} atualizado com evento do Google Calendar`);
+                  if (meetLink) {
+                    console.log(`🔗 Link do Google Meet: ${meetLink}`);
+                  }
+                }
+              }
+            }
+          } catch (calendarError) {
+            console.error('❌ Erro ao criar evento no Google Calendar:', calendarError);
+            // Não falhar o webhook por causa do Google Calendar
+          }
+        }
       }
     }
 

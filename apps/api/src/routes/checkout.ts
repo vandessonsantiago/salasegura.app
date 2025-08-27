@@ -436,4 +436,56 @@ router.post("/", async (req: Request, res: Response) => {
   }
 })
 
+// Endpoint para verificar status do pagamento
+router.get("/status/:paymentId", async (req: Request, res: Response) => {
+  try {
+    const { paymentId } = req.params
+
+    if (!paymentId) {
+      return res.status(400).json({ error: "Payment ID é obrigatório" })
+    }
+
+    console.log(`🔍 Verificando status do pagamento: ${paymentId}`)
+
+    // Buscar pagamento no Asaas
+    const response = await axios.get(
+      `${ASAAS_CONFIG.BASE_URL}/payments/${paymentId}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "access_token": ASAAS_CONFIG.API_KEY,
+        },
+      }
+    )
+
+    const payment = response.data
+    console.log(`✅ Status do pagamento ${paymentId}: ${payment.status}`)
+
+    // Retornar apenas as informações essenciais
+    res.json({
+      id: payment.id,
+      status: payment.status,
+      value: payment.value,
+      netValue: payment.netValue,
+      paymentDate: payment.paymentDate,
+      description: payment.description,
+    })
+
+  } catch (error) {
+    console.error("Erro ao verificar status do pagamento:", error)
+
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 404) {
+        return res.status(404).json({ error: "Pagamento não encontrado" })
+      }
+      return res.status(error.response?.status || 500).json({
+        error: "Erro na API do Asaas",
+        details: error.response?.data
+      })
+    }
+
+    res.status(500).json({ error: "Erro interno do servidor" })
+  }
+})
+
 export default router

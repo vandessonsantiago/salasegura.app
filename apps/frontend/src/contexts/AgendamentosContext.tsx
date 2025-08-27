@@ -36,8 +36,8 @@ export interface ConsultaAgendada {
   qrCodePix?: string
   copyPastePix?: string
   pixExpiresAt?: string
-  calendarEventId?: string
-  googleMeetLink?: string
+  calendar_event_id?: string
+              googleMeetLink?: string  // Fix: Backend sends camelCase, not snake_case
 }
 
 interface AgendamentosContextType {
@@ -105,31 +105,55 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               copy_paste_pix?: string
               pix_expires_at?: string
               calendar_event_id?: string
-              google_meet_link?: string
+              googleMeetLink?: string  // Fix: Backend sends camelCase, not snake_case
             }
 
             const consultasConvertidas = (result.data as BackendConsulta[]).map(
-              (item) => ({
-                id: item.id,
-                data: item.data,
-                horario: item.horario,
-                status: item.status,
-                paymentId: item.payment_id,
-                paymentStatus: item.payment_status,
-                valor: parseFloat(String(item.valor)),
-                descricao: item.descricao,
-                cliente: {
-                  nome: item.cliente_nome,
-                  email: item.cliente_email,
-                  telefone: item.cliente_telefone,
-                },
-                createdAt: item.created_at,
-                qrCodePix: item.qr_code_pix,
-                copyPastePix: item.copy_paste_pix,
-                pixExpiresAt: item.pix_expires_at,
-                calendarEventId: item.calendar_event_id,
-                googleMeetLink: item.google_meet_link,
-              })
+              (item) => {
+                const converted = {
+                  id: item.id,
+                  data: item.data,
+                  horario: item.horario,
+                  status: item.status,
+                  paymentId: item.payment_id,
+                  paymentStatus: item.payment_status,
+                  valor: parseFloat(String(item.valor || 0)),
+                  descricao: item.descricao || 'Agendamento para consulta de alinhamento inicial',
+                  cliente: {
+                    nome: item.cliente_nome || 'Não informado',
+                    email: item.cliente_email || '',
+                    telefone: item.cliente_telefone || '',
+                  },
+                  createdAt: item.created_at || new Date().toISOString(),
+                  qrCodePix: item.qr_code_pix,
+                  copyPastePix: item.copy_paste_pix,
+                  pixExpiresAt: item.pix_expires_at,
+                  calendarEventId: item.calendar_event_id,
+                  googleMeetLink: item.googleMeetLink,
+                };
+
+                console.log(`🔄 Conversão do agendamento ${item.id}:`, {
+                  original_google_meet_link: item.googleMeetLink,
+                  converted_google_meet_link: converted.googleMeetLink,
+                  original_status: item.status,
+                  converted_status: converted.status,
+                  original_calendar_event_id: item.calendar_event_id,
+                  converted_calendar_event_id: converted.calendarEventId,
+                  // Análises detalhadas do link
+                  link_type: typeof item.googleMeetLink,
+                  link_length: item.googleMeetLink?.length,
+                  link_is_empty: item.googleMeetLink === "",
+                  link_is_null: item.googleMeetLink === null,
+                  link_is_undefined: item.googleMeetLink === undefined,
+                  link_trimmed: item.googleMeetLink?.trim(),
+                  link_trimmed_empty: item.googleMeetLink?.trim() === "",
+                  has_valid_link: item.googleMeetLink && item.googleMeetLink.trim() !== "",
+                  status_is_confirmed: item.status === "CONFIRMED",
+                  has_calendar_event: !!item.calendar_event_id
+                });
+
+                return converted;
+              }
             )
 
             console.log("✅ Agendamentos carregados do banco:", consultasConvertidas.length)
@@ -138,6 +162,10 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
           }
         } catch (backendError) {
           console.error("❌ Erro ao buscar do backend:", backendError)
+          // Se for erro de API não disponível, mostra mensagem mais clara
+          if (backendError instanceof Error && backendError.message.includes('API não está disponível')) {
+            console.log("🔄 API não disponível, usando localStorage como fallback")
+          }
         }
       } else {
         console.log("❌ Usuário não logado ou sem token")
@@ -193,47 +221,57 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         qr_code_pix: consulta.qrCodePix,
         copy_paste_pix: consulta.copyPastePix,
         pix_expires_at: consulta.pixExpiresAt,
-        calendar_event_id: consulta.calendarEventId ?? c.eventId,
+        calendar_event_id: consulta.calendar_event_id ?? c.eventId,
         google_meet_link: consulta.googleMeetLink ?? c.meetLink,
       }
 
       // Salvar no backend Supabase quando houver sessão
       if (session?.access_token) {
-        const result = await authJsonFetch("/agendamentos", session.access_token, {
-          method: "POST",
-          body: JSON.stringify(consultaBackend),
-        })
+        try {
+          const result = await authJsonFetch("/agendamentos", session.access_token, {
+            method: "POST",
+            body: JSON.stringify(consultaBackend),
+          })
 
-        if (result && result.success && result.data && result.data.id) {
-          const novaConsulta: ConsultaAgendada = {
-            id: result.data.id,
-            data: result.data.data,
-            horario: result.data.horario,
-            status: result.data.status,
-            paymentId: result.data.payment_id,
-            paymentStatus: result.data.payment_status,
-            valor: parseFloat(String(result.data.valor)),
-            descricao: result.data.descricao,
-            cliente: {
-              nome: result.data.cliente_nome,
-              email: result.data.cliente_email,
-              telefone: result.data.cliente_telefone,
-            },
-            createdAt: result.data.created_at,
-            qrCodePix: result.data.qr_code_pix,
-            copyPastePix: result.data.copy_paste_pix,
-            pixExpiresAt: result.data.pix_expires_at,
-            calendarEventId: result.data.calendar_event_id,
-            googleMeetLink: result.data.google_meet_link,
+          if (result && result.success && result.data && result.data.id) {
+            const novaConsulta: ConsultaAgendada = {
+              id: result.data.id,
+              data: result.data.data,
+              horario: result.data.horario,
+              status: result.data.status,
+              paymentId: result.data.payment_id,
+              paymentStatus: result.data.payment_status,
+              valor: parseFloat(String(result.data.valor)),
+              descricao: result.data.descricao,
+              cliente: {
+                nome: result.data.cliente_nome,
+                email: result.data.cliente_email,
+                telefone: result.data.cliente_telefone,
+              },
+              createdAt: result.data.created_at,
+              qrCodePix: result.data.qr_code_pix,
+              copyPastePix: result.data.copy_paste_pix,
+              pixExpiresAt: result.data.pix_expires_at,
+              calendar_event_id: result.data.calendar_event_id,
+              googleMeetLink: result.data.googleMeetLink,
+            }
+
+            const updatedConsultas = [...consultasAgendadas, novaConsulta]
+            setConsultasAgendadas(updatedConsultas)
+            saveConsultasToStorage(updatedConsultas)
+            return novaConsulta
           }
 
-          const updatedConsultas = [...consultasAgendadas, novaConsulta]
-          setConsultasAgendadas(updatedConsultas)
-          saveConsultasToStorage(updatedConsultas)
-          return novaConsulta
+          throw new Error("Backend não retornou o id do agendamento criado.")
+        } catch (backendError) {
+          console.error("❌ Erro ao salvar no backend:", backendError)
+          // Se for erro de API não disponível, continua com localStorage
+          if (backendError instanceof Error && backendError.message.includes('API não está disponível')) {
+            console.log("🔄 API não disponível, salvando apenas no localStorage")
+          } else {
+            throw backendError
+          }
         }
-
-        throw new Error("Backend não retornou o id do agendamento criado.")
       }
 
       // Fallback para localStorage se não houver sessão
@@ -285,7 +323,13 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
   }
 
   const refresh = async () => {
-    await loadConsultasFromStorage()
+    console.log("🔄 Fazendo refresh forçado dos agendamentos do banco...")
+    try {
+      await loadConsultasFromStorage()
+      console.log("✅ Refresh concluído - dados atualizados do banco")
+    } catch (error) {
+      console.error("❌ Erro no refresh:", error)
+    }
   }
 
   const getLatestConsulta = (): ConsultaAgendada | null => {

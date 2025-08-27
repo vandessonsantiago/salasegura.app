@@ -17,7 +17,7 @@ export default function Hero() {
   const [showAgendamento, setShowAgendamento] = useState(false);
   const [showMeusAgendamentos, setShowMeusAgendamentos] = useState(false);
   const { sessions, currentSession } = useChecklist();
-  const { hasConsultas, getLatestConsulta, formatStatus, formatDate } = useAgendamentos();
+  const { hasConsultas, getLatestConsulta, formatStatus, formatDate, loading } = useAgendamentos();
 
   const handleLogin = () => {
     router.push('/login');
@@ -79,8 +79,8 @@ export default function Hero() {
               highlight={true}
             />
 
-            {/* Card 3 - Consulta (só aparece se NÃO tiver agendamentos) */}
-            {!hasConsultas && (
+            {/* Card 3 - Consulta (só aparece se NÃO tiver agendamentos E não estiver carregando) */}
+            {!loading && !hasConsultas && (
               <CardHero
                 icon={<CalendarIcon size={22} />}
                 title="Agendar Consulta de Alinhamento Inicial"
@@ -96,18 +96,54 @@ export default function Hero() {
               />
             )}
 
-            {/* Card 3 - Meus Agendamentos (só aparece se TIVER agendamentos) */}
-            {hasConsultas && latestConsulta && (
+            {/* Card 3 - Loading (enquanto carrega dados de agendamento) */}
+            {loading && (
               <CardHero
                 icon={<CalendarIcon size={22} />}
-                title={`Próxima Consulta - ${formatDate(latestConsulta.data)} às ${latestConsulta.horario}`}
-                description={latestConsulta.descricao}
+                title="Carregando agendamentos..."
+                button={{
+                  text: "CARREGANDO...",
+                  variant: "secondary",
+                  onClick: () => {}
+                }}
+              />
+            )}
+
+            {/* Card 3 - Consulta (só aparece se NÃO tiver agendamentos E não estiver carregando) */}
+            {!loading && !hasConsultas && (
+              <CardHero
+                icon={<CalendarIcon size={22} />}
+                title="Agendar Consulta de Alinhamento Inicial"
+                price={{
+                  original: "R$ 759,00",
+                  current: "R$ 99,00"
+                }}
+                button={{
+                  text: "AGENDAR CONSULTA",
+                  variant: "primary",
+                  onClick: () => setShowAgendamento(true)
+                }}
+              />
+            )}
+
+            {/* Card 3 - Meus Agendamentos (só aparece se TIVER agendamentos E não estiver carregando) */}
+            {!loading && hasConsultas && latestConsulta && (
+              <CardHero
+                icon={<CalendarIcon size={22} />}
+                title="Meus Agendamentos"
                 status={consultaStatus || undefined}
                 button={{
                   text: "VER AGENDAMENTOS",
-                  variant: "secondary",
+                  variant: consultaStatus?.text === 'Confirmado' ? "primary" : "secondary",
                   onClick: () => setShowMeusAgendamentos(true)
                 }}
+                customContent={
+                  <div className="mt-3 text-xs text-gray-600">
+                    {latestConsulta && latestConsulta.status === 'CONFIRMED' && latestConsulta.googleMeetLink && (
+                      <p className="text-green-600 font-medium">✅ Link da reunião disponível</p>
+                    )}
+                  </div>
+                }
               />
             )}
           </div>

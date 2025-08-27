@@ -14,6 +14,10 @@ import {
   CreditCardIcon,
   VideoCameraIcon,
   ArrowUpRightIcon,
+  UserIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  CurrencyDollarIcon,
 } from "@phosphor-icons/react"
 import {
   useAgendamentos,
@@ -31,21 +35,55 @@ export default function MeusAgendamentosModal({
   onClose,
   onAlterarAgendamento,
 }: MeusAgendamentosModalProps) {
-  const { consultasAgendadas, removeConsulta } = useAgendamentos()
+  const { consultasAgendadas, removeConsulta, refresh } = useAgendamentos()
   const [selectedConsulta, setSelectedConsulta] =
     useState<ConsultaAgendada | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Forçar re-render quando consultasAgendadas muda
+  // Auto-refresh a cada 30 segundos quando o modal está aberto
   useEffect(() => {
-    console.log(
-      "📊 Agendamentos atualizados no modal:",
-      consultasAgendadas.length
-    )
-  }, [consultasAgendadas])
+    if (!isOpen) return
+
+    const interval = setInterval(() => {
+      console.log("� Auto-refresh: verificando atualizações no banco...")
+      handleRefresh()
+    }, 30000) // 30 segundos
+
+    return () => clearInterval(interval)
+  }, [isOpen])
+
+  // Efeito para refresh inicial quando o modal abre
+  useEffect(() => {
+    if (isOpen) {
+      console.log("🔄 Modal aberto: carregando dados mais recentes do banco...")
+      handleRefresh()
+    }
+  }, [isOpen])
+
+  // Função para refresh com loading state
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await refresh()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose()
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "CONFIRMED":
+        return <CheckIcon size={24} className="text-white" weight="fill" />
+      case "PENDING":
+        return <ClockIcon size={24} className="text-white" weight="fill" />
+      default:
+        return <CalendarIcon size={24} className="text-white" weight="fill" />
     }
   }
 
@@ -78,11 +116,54 @@ export default function MeusAgendamentosModal({
     }
   }
 
-  const formatarData = (data: string) => {
-    return new Date(data).toLocaleDateString("pt-BR")
+  const handleVerificarPagamento = async (consulta: ConsultaAgendada) => {
+    try {
+      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${consulta.paymentId}`)
+      if (!response.ok) {
+        throw new Error('Erro ao verificar pagamento')
+      }
+
+      const data = await response.json()
+      console.log('Status do pagamento:', data)
+
+      if (data.status === 'CONFIRMED' || data.status === 'RECEIVED') {
+        // Atualizar status no contexto e forçar refresh do banco
+        await refresh()
+        alert('Pagamento confirmado com sucesso! Status atualizado.')
+      } else if (data.status === 'PENDING') {
+        alert('Pagamento ainda está pendente. Aguarde a confirmação ou tente novamente em alguns instantes.')
+      } else if (data.status === 'REFUNDED' || data.status === 'CANCELLED') {
+        alert('Pagamento foi cancelado ou reembolsado. Entre em contato conosco para mais informações.')
+      } else {
+        alert(`Status do pagamento: ${data.status}. Entre em contato conosco se precisar de ajuda.`)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar pagamento:', error)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        alert('Erro de conexão. Verifique sua internet e tente novamente.')
+      } else {
+        alert('Erro ao verificar status do pagamento. Tente novamente.')
+      }
+    }
   }
 
-  const formatarHorario = (horario: string) => {
+  const formatarData = (data: string | undefined | null) => {
+    if (!data) return "Data não informada"
+
+    try {
+      const date = new Date(data)
+      if (isNaN(date.getTime())) {
+        return "Data inválida"
+      }
+      return date.toLocaleDateString("pt-BR")
+    } catch (error) {
+      console.error("Erro ao formatar data:", data, error)
+      return "Data inválida"
+    }
+  }
+
+  const formatarHorario = (horario: string | undefined | null) => {
+    if (!horario) return "Horário não informado"
     return horario
   }
 
@@ -112,7 +193,7 @@ export default function MeusAgendamentosModal({
       case "EXPIRED":
         return "Expirado"
       default:
-        return "Desconhecido"
+        return status || "Desconhecido"
     }
   }
 
@@ -132,196 +213,253 @@ export default function MeusAgendamentosModal({
               <div>
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                   <CalendarIcon size={20} weight="fill" className="sm:w-6 sm:h-6" />
-                  Meus Agendamentos
+                  Minhas Consultas
                 </h2>
                 <p className="text-blue-100 text-xs sm:text-sm mt-1">
-                  Gerencie suas consultas agendadas
+                  Acompanhe seus agendamentos e reuniões
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="text-white hover:text-blue-200 transition-colors p-1"
-              >
-                <XIcon size={20} weight="bold" className="sm:w-6 sm:h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="text-white hover:text-blue-200 transition-colors p-2 disabled:opacity-50"
+                  title="Atualizar dados do banco"
+                >
+                  {isRefreshing ? (
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="text-white hover:text-blue-200 transition-colors p-1"
+                >
+                  <XIcon size={20} weight="bold" className="sm:w-6 sm:h-6" />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(90vh-100px)] sm:max-h-[calc(90vh-120px)]">
+          <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-100px)] sm:max-h-[calc(90vh-120px)]">
+            {isRefreshing && (
+              <div className="flex items-center justify-center py-4 mb-4">
+                <div className="flex items-center gap-2 text-blue-600">
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <span className="text-sm">Atualizando dados do banco...</span>
+                </div>
+              </div>
+            )}
+
             {consultasAgendadas.length === 0 ? (
-              <div className="text-center py-6 sm:py-8">
+              <div className="text-center py-8 sm:py-12">
                 <CalendarIcon
-                  size={48}
-                  className="text-gray-400 mx-auto mb-4 sm:w-16 sm:h-16"
+                  size={64}
+                  className="text-gray-400 mx-auto mb-6"
                   weight="light"
                 />
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3">
                   Nenhum agendamento encontrado
                 </h3>
-                <p className="text-sm sm:text-base text-gray-600">
-                  Você ainda não possui consultas agendadas.
+                <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto">
+                  Você ainda não possui consultas agendadas. Agende sua primeira consulta para começar.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-4 sm:space-y-6">
+                {/* Info sobre atualização de dados */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 text-center">
+                    Use 🔄 para atualizar se necessário.
+                  </p>
+                </div>
+
                 {consultasAgendadas.map((consulta) => (
                   <div
                     key={consulta.id}
-                    className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow"
+                    className="group bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-gray-200 transition-all duration-300 overflow-hidden"
                   >
-                    {/* Header da consulta */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg flex-shrink-0">
+                    {/* Header simplificado */}
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-lg">
                           <CalendarIcon
-                            size={16}
-                            className="text-blue-600 sm:w-5 sm:h-5"
+                            size={20}
+                            className="text-blue-600"
                             weight="fill"
                           />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base leading-tight">
-                            Consulta - {formatarData(consulta.data)} às{" "}
-                            {formatarHorario(consulta.horario)}
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            Consulta de Alinhamento
                           </h3>
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            Criado em {formatarData(consulta.createdAt)}
+                          <p className="text-sm text-gray-600">
+                            {formatarData(consulta.createdAt)}
                           </p>
                         </div>
                       </div>
                       <span
-                        className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border flex-shrink-0 self-start sm:self-center ${getStatusColor(consulta.status)}`}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(consulta.status)}`}
                       >
                         {getStatusText(consulta.status)}
                       </span>
                     </div>
 
-                    {/* Detalhes da consulta */}
-                    <div className="bg-gray-50 rounded-lg p-2 sm:p-3 mb-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Cliente:
-                          </span>
-                          <p className="text-gray-900 truncate">
-                            {consulta.cliente.nome}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Valor:
-                          </span>
-                          <p className="text-gray-900">
-                            R$ {consulta.valor.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Email:
-                          </span>
-                          <p className="text-gray-900 truncate text-xs sm:text-sm">
-                            {consulta.cliente.email}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Telefone:
-                          </span>
-                          <p className="text-gray-900">
-                            {consulta.cliente.telefone}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status do pagamento */}
-                    {consulta.status === "PENDING" && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 sm:p-3 mb-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <ClockIcon
-                            size={14}
-                            className="text-yellow-600 flex-shrink-0 sm:w-4 sm:h-4"
-                            weight="fill"
-                          />
-                          <span className="text-xs sm:text-sm font-medium text-yellow-800">
-                            Aguardando pagamento
-                          </span>
-                        </div>
-                        <p className="text-xs text-yellow-700 leading-relaxed">
-                          O pagamento deve ser realizado em até 24 horas para
-                          confirmar o agendamento.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Link do Google Meet para consultas confirmadas */}
-                    {consulta.status === "CONFIRMED" &&
-                      consulta.googleMeetLink && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-2 sm:p-3 mb-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <VideoCameraIcon
-                              size={14}
-                              className="text-green-600 flex-shrink-0 sm:w-4 sm:h-4"
+                    {/* Content - Versão simplificada e focada */}
+                    <div className="p-6">
+                      {/* Data e Horário - Destaque principal */}
+                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-blue-600 p-3 rounded-xl">
+                            <CalendarIcon
+                              size={20}
+                              className="text-white"
                               weight="fill"
                             />
-                            <span className="text-xs sm:text-sm font-medium text-green-800">
-                              Reunião confirmada
-                            </span>
                           </div>
-                          <p className="text-xs text-green-700 mb-2 leading-relaxed">
-                            Sua consulta foi confirmada e o link do Google Meet
-                            está disponível.
-                          </p>
-                          <button
-                            onClick={() =>
-                              handleEntrarReuniao(consulta.googleMeetLink)
-                            }
-                            className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded text-xs font-medium hover:bg-green-700 transition-colors flex items-center gap-1"
-                          >
-                            <ArrowUpRightIcon size={12} weight="fill" />
-                            Entrar na reunião
-                          </button>
+                          <div>
+                            <p className="font-bold text-gray-900 text-lg">
+                              {formatarData(consulta.data)}
+                            </p>
+                            <p className="text-blue-700 font-semibold">
+                              às {formatarHorario(consulta.horario)}
+                            </p>
+                          </div>
                         </div>
-                      )}
+                      </div>
 
-                    {/* Ações */}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {consulta.status === "PENDING" && (
-                        <>
-                          <button
-                            onClick={() => handleReabrirPix(consulta)}
-                            className="flex-1 bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                          >
-                            <QrCodeIcon size={14} weight="fill" className="sm:w-4 sm:h-4" />
-                            Reabrir PIX
-                          </button>
-                          <button
-                            onClick={() => handleAlterarAgendamento(consulta)}
-                            className="flex-1 bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                          >
-                            <PencilSimpleIcon size={14} weight="fill" className="sm:w-4 sm:h-4" />
-                            Alterar
-                          </button>
-                        </>
-                      )}
+                      {/* Link do Google Meet - Só mostrar se disponível */}
+                      {/* Link do Google Meet - Só mostrar se disponível */}
+                      {(() => {
+                        console.log("🔍 === ANÁLISE DETALHADA DO LINK NO FRONTEND ===");
+                        console.log("📋 Dados da consulta:", {
+                          id: consulta.id,
+                          status: consulta.status,
+                          googleMeetLink: consulta.googleMeetLink,
+                          calendarEventId: consulta.calendar_event_id,
+                          // Análises detalhadas
+                          link_type: typeof consulta.googleMeetLink,
+                          link_length: consulta.googleMeetLink?.length,
+                          link_is_empty_string: consulta.googleMeetLink === "",
+                          link_is_null: consulta.googleMeetLink === null,
+                          link_is_undefined: consulta.googleMeetLink === undefined,
+                          link_trimmed: consulta.googleMeetLink?.trim(),
+                          link_trimmed_is_empty: consulta.googleMeetLink?.trim() === "",
+                          status_is_confirmed: consulta.status === "CONFIRMED",
+                          has_calendar_event: !!consulta.calendar_event_id
+                        });
 
-                      {consulta.status === "CONFIRMED" && (
+                        // Condições de verificação (mais claras e detalhadas)
+                        const linkExists = consulta.googleMeetLink !== null && consulta.googleMeetLink !== undefined;
+                        const linkIsString = typeof consulta.googleMeetLink === 'string';
+                        const linkNotEmpty = consulta.googleMeetLink !== "";
+                        const linkNotWhitespace = consulta.googleMeetLink?.trim() !== "";
+                        const statusIsConfirmed = consulta.status === "CONFIRMED";
+                        const hasCalendarEvent = !!consulta.calendar_event_id;
+
+                        console.log("🔍 Condições de verificação:", {
+                          linkExists,
+                          linkIsString,
+                          linkNotEmpty,
+                          linkNotWhitespace,
+                          statusIsConfirmed,
+                          hasCalendarEvent,
+                          final_hasValidLink: linkExists && linkIsString && linkNotEmpty && linkNotWhitespace
+                        });
+
+                        // Condição final para exibir o link
+                        const hasValidLink = linkExists && linkIsString && linkNotEmpty && linkNotWhitespace;
+
+                        console.log("🎯 DECISÃO FINAL:", {
+                          hasValidLink,
+                          action: hasValidLink ? "EXIBIR BOTÃO DA REUNIÃO" :
+                                 (hasCalendarEvent && statusIsConfirmed) ? "EXIBIR MENSAGEM DE EVENTO CRIADO" :
+                                 statusIsConfirmed ? "EXIBIR MENSAGEM DE AGUARDAR LINK" :
+                                 "NÃO EXIBIR NADA"
+                        });
+                        console.log("🔍 === FIM DA ANÁLISE ===");
+
+                        return hasValidLink ? (
+                          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <VideoCameraIcon
+                                size={18}
+                                className="text-green-600 flex-shrink-0"
+                                weight="fill"
+                              />
+                              <span className="text-sm font-medium text-green-800">
+                                Sala de reunião
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleEntrarReuniao(consulta.googleMeetLink)}
+                              className="w-full bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                            >
+                              <ArrowUpRightIcon size={16} weight="fill" />
+                              Entrar na reunião
+                            </button>
+                          </div>
+                        ) : hasCalendarEvent && statusIsConfirmed ? (
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+                            <p className="text-sm text-blue-800 text-center">
+                              Reunião agendada! O link será enviado em breve.
+                            </p>
+                            <p className="text-xs text-blue-600 text-center mt-1">
+                              Clique em 🔄 para atualizar se necessário
+                            </p>
+                          </div>
+                        ) : statusIsConfirmed ? (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
+                            <p className="text-sm text-yellow-800 text-center">
+                              Link da reunião será enviado em breve
+                            </p>
+                          </div>
+                        ) : null
+                      })()}                      {/* Ações simplificadas */}
+                      <div className="space-y-3">
+                        {consulta.status === "PENDING" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                              onClick={() => handleReabrirPix(consulta)}
+                              className="bg-blue-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <QrCodeIcon size={16} weight="fill" />
+                              Pagar agora
+                            </button>
+                            <button
+                              onClick={() => handleVerificarPagamento(consulta)}
+                              className="bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <CheckIcon size={16} weight="fill" />
+                              Já paguei
+                            </button>
+                          </div>
+                        )}
+
+                        {consulta.status === "CONFIRMED" && (
+                          <div className="space-y-3">
+                            <button
+                              onClick={() => handleAlterarAgendamento(consulta)}
+                              className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <PencilSimpleIcon size={16} weight="fill" />
+                              Reagendar
+                            </button>
+                          </div>
+                        )}
+
                         <button
-                          onClick={() => handleAlterarAgendamento(consulta)}
-                          className="flex-1 bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition-colors"
+                          onClick={() => handleCancelarConsulta(consulta.id)}
+                          className="w-full bg-red-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                         >
-                          ✏️ Alterar
+                          <TrashIcon size={16} weight="fill" />
+                          Cancelar
                         </button>
-                      )}
-
-                      <button
-                        onClick={() => handleCancelarConsulta(consulta.id)}
-                        className="bg-red-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2 sm:w-auto w-full"
-                      >
-                        <TrashIcon size={14} weight="fill" className="sm:w-4 sm:h-4" />
-                        Cancelar
-                      </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -444,7 +582,11 @@ export default function MeusAgendamentosModal({
                         }
                         alert("Solicitação de confirmação enviada! Aguarde a atualização do status.")
                       } catch (err) {
-                        alert("Erro ao enviar solicitação: " + err)
+                        if (err instanceof TypeError && err.message.includes('fetch')) {
+                          alert("Erro de conexão. Verifique sua internet e tente novamente.")
+                        } else {
+                          alert("Erro ao enviar solicitação: " + err)
+                        }
                       }
                     }}
                   >

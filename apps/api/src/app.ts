@@ -10,7 +10,7 @@ import conversionsRoutes from "./routes/conversions";
 import dashboardChatRoutes from "./routes/dashboardChat";
 import checklistRoutes from "./routes/checklist";
 import { errorHandler } from "./middleware/errorHandler";
-const express = require('express');
+import express from 'express';
 import { requestLogger } from "./middleware/requestLogger";
 
 export const createApp = (): Express => {

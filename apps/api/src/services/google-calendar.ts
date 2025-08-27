@@ -435,13 +435,51 @@ export async function createCalendarEvent(params: {
   })
 
   const eventId = String(response?.data?.id || "")
-  const meetLink = String(
+  let meetLink = String(
     response?.data?.hangoutLink ||
       response?.data?.conferenceData?.entryPoints?.find(
         (e) => e.entryPointType === "video"
       )?.uri ||
       ""
   )
+
+  // Se não conseguimos o link do Meet, tentar buscar o evento novamente após um pequeno delay
+  if (!meetLink && eventId) {
+    console.log(`🔄 Tentando buscar link do Meet novamente para evento ${eventId}...`)
+    await new Promise(resolve => setTimeout(resolve, 2000)) // Aguardar 2 segundos
+
+    try {
+      const eventResponse = await calendar.events.get({
+        auth,
+        calendarId,
+        eventId,
+      })
+
+      meetLink = String(
+        eventResponse?.data?.hangoutLink ||
+          eventResponse?.data?.conferenceData?.entryPoints?.find(
+            (e) => e.entryPointType === "video"
+          )?.uri ||
+          ""
+      )
+
+      console.log(`🔍 Tentativa de rebusca - meetLink:`, meetLink)
+    } catch (error) {
+      console.error(`❌ Erro ao buscar evento novamente:`, error)
+    }
+  }
+
+  console.log(`🔍 Debug createCalendarEvent:`, {
+    eventId,
+    meetLink,
+    hangoutLink: response?.data?.hangoutLink,
+    conferenceData: response?.data?.conferenceData,
+    entryPoints: response?.data?.conferenceData?.entryPoints,
+    hasHangoutLink: !!response?.data?.hangoutLink,
+    hasConferenceData: !!response?.data?.conferenceData,
+    hasEntryPoints: !!response?.data?.conferenceData?.entryPoints
+  });
+
   return { eventId, meetLink }
 }
 

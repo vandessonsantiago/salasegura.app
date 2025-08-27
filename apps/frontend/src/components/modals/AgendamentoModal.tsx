@@ -2,18 +2,30 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { CalendarIcon } from "@phosphor-icons/react"
-import { useAgendamentos } from "../../contexts/AgendamentosContext"
+import {
+  useAgendamentos,
+  type ConsultaAgendada,
+} from "../../contexts/AgendamentosContext"
+import { useAuth } from "../../contexts/AuthContext"
 import CheckoutComponent from "../payments/CheckoutComponent"
 import { apiEndpoint } from "../../lib/api"
 
 // Helper para fazer requests para a API
 const api = {
   fetch: async (path: string, init?: RequestInit) => {
-    const response = await fetch(apiEndpoint(path), init);
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+    try {
+      const response = await fetch(apiEndpoint(path), init);
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
+      }
+      return response.json();
+    } catch (error) {
+      // Trata erros de rede/conectividade
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('API não está disponível. Verifique se o servidor está rodando.');
+      }
+      throw error;
     }
-    return response.json();
   }
 };
 
@@ -63,6 +75,7 @@ export default function AgendamentoModal({
   const [selectedTime, setSelectedTime] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
+  const [currentAgendamentoId, setCurrentAgendamentoId] = useState<string | null>(null)
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [availableSlotsDetailed, setAvailableSlotsDetailed] = useState<
     AvailableSlotDetailed[]
@@ -72,8 +85,10 @@ export default function AgendamentoModal({
     [date: string]: string[]
   }>({})
   const [loadingDates, setLoadingDates] = useState(false)
+  const [clienteTelefone, setClienteTelefone] = useState<string>("")
 
   const { addConsulta } = useAgendamentos()
+  const { user } = useAuth()
 
   // Buscar datas disponíveis nos próximos 15 dias
   const fetchAvailableDates = useCallback(async () => {
@@ -235,20 +250,27 @@ export default function AgendamentoModal({
       return
     }
 
+    if (!clienteTelefone.trim()) {
+      alert("Por favor, informe seu telefone para contato")
+      return
+    }
+
+    setLoading(true)
+    try {
     // Cria o agendamento no backend e só depois inicia o checkout
     const consultaTemp = {
-      id: undefined, // será preenchido pelo backend
+      id: `temp_${Date.now()}`, // ID temporário, será substituído pelo backend
       data: selectedDate,
       horario: selectedTime,
-      status: "PENDING",
+      status: "PENDING" as const,
       paymentId: "",
-      paymentStatus: "PENDING",
+      paymentStatus: "PENDING" as const,
       valor: 99.0,
       descricao: `Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`,
       cliente: {
-        nome: "Vandesson Santiago",
-        email: "vandesson.santiago@outlook.com",
-        telefone: "(92) 98409-3014",
+        nome: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
+        email: user?.email || "",
+        telefone: clienteTelefone || "(92) 99999-9999", // Fallback caso não seja informado
       },
       createdAt: new Date().toISOString(),
       qrCodePix: undefined,
@@ -256,17 +278,22 @@ export default function AgendamentoModal({
       pixExpiresAt: undefined,
       calendarEventId: selectedSlotDetail?.calendarEventId || selectedSlotDetail?.eventId,
       googleMeetLink: selectedSlotDetail?.googleMeetLink || selectedSlotDetail?.meetLink,
-    }
+    }      // Salva no backend e obtém o id real
+      const novaConsulta = await addConsulta(consultaTemp)
+      if (!novaConsulta || !novaConsulta.id) {
+        alert("Erro ao criar agendamento. Tente novamente.")
+        return
+      }
 
-    // Salva no backend e obtém o id real
-    const novaConsulta = await addConsulta(consultaTemp)
-    if (!novaConsulta || !novaConsulta.id) {
+      // Armazenar o ID do agendamento e mostrar o checkout
+      setCurrentAgendamentoId(novaConsulta.id)
+      setShowCheckout(true)
+    } catch (error) {
+      console.error("Erro ao criar agendamento:", error)
       alert("Erro ao criar agendamento. Tente novamente.")
-      return
+    } finally {
+      setLoading(false)
     }
-
-    // Agora inicia o checkout com o agendamentoId correto
-    setShowCheckout(novaConsulta.id)
   }
 
   // store the selected detailed slot (so we can save eventId/meetLink)
@@ -280,44 +307,16 @@ export default function AgendamentoModal({
   ) => {
     console.log("Pagamento realizado:", { paymentId, status, pixData })
 
-    // Criar nova consulta agendada
-    const novaConsulta = {
-      id: `consulta_${Date.now()}`,
-      data: selectedDate,
-      horario: selectedTime,
-      // prefer canonical names for persistence
-      calendarEventId:
-        selectedSlotDetail?.calendarEventId || selectedSlotDetail?.eventId,
-      googleMeetLink:
-        selectedSlotDetail?.googleMeetLink || selectedSlotDetail?.meetLink,
-      status: "PENDING" as const,
-      paymentId: paymentId,
-      paymentStatus: "PENDING" as any,
-      valor: 99.0,
-      descricao: `Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`,
-      cliente: {
-        nome: "Vandesson Santiago",
-        email: "vandesson.santiago@outlook.com",
-        telefone: "(92) 98409-3014",
-      },
-      createdAt: new Date().toISOString(),
-      qrCodePix: pixData?.qrCode,
-      copyPastePix: pixData?.copyPaste,
-      pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 horas
+    // Atualizar o agendamento existente com os dados do pagamento
+    if (currentAgendamentoId) {
+      // Aqui podemos atualizar o agendamento com dados do PIX se necessário
+      console.log("💰 Pagamento confirmado para agendamento:", currentAgendamentoId)
     }
 
-    // ADICIONA à lista consultasAgendadas (persiste no Supabase)
-    console.log("💾 Salvando agendamento no banco:", novaConsulta)
-    console.log("🔍 Dados PIX para salvar:", {
-      qrCodePix: novaConsulta.qrCodePix?.substring(0, 50) + "...",
-      copyPastePix: novaConsulta.copyPastePix?.substring(0, 50) + "...",
-      pixExpiresAt: novaConsulta.pixExpiresAt,
-    })
-    await addConsulta(novaConsulta)
-    console.log("✅ Agendamento salvo com sucesso!")
-
+    // NÃO fechar o modal aqui - deixar o CheckoutComponent gerenciar
     // O checkout vai mostrar countdown de 15s e depois fechar automaticamente
-    // Não fechamos aqui - deixamos o CheckoutComponent gerenciar
+    // setShowCheckout(false)
+    // setCurrentAgendamentoId(null)
   }
 
   const handleCheckoutError = (error: string) => {
@@ -377,7 +376,7 @@ export default function AgendamentoModal({
             productName="Consulta de Alinhamento Inicial"
             productDescription={`Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`}
             customerId={undefined}
-            agendamentoId={showCheckout}
+            agendamentoId={currentAgendamentoId || undefined}
             onSuccess={handleCheckoutSuccess}
             onError={handleCheckoutError}
             onCancel={handleCheckoutCancel}
@@ -482,6 +481,39 @@ export default function AgendamentoModal({
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Informações de Contato */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">
+                📞 Informações de contato:
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nome: <span className="text-blue-600">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente"}</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email: <span className="text-blue-600">{user?.email}</span>
+                  </label>
+                </div>
+                <div>
+                  <label htmlFor="telefone" className="block text-sm font-medium text-gray-700 mb-1">
+                    Telefone: <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    id="telefone"
+                    value={clienteTelefone}
+                    onChange={(e) => setClienteTelefone(e.target.value)}
+                    placeholder="(92) 99999-9999"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Informações */}

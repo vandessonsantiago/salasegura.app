@@ -11,7 +11,7 @@ type AuthenticatedRequest = Request & {
 };
 
 export class AgendamentosController {
-  // Buscar todos os agendamentos do usuário
+    // Buscar todos os agendamentos do usuário
   static async getUserAgendamentos(
     req: AuthenticatedRequest,
     res: Response
@@ -58,35 +58,110 @@ export class AgendamentosController {
 
       console.log("✅ Agendamentos encontrados:", data?.length || 0);
 
+      // Log detalhado de TODOS os agendamentos com seus dados completos
+      console.log("🔍 === LOG DETALHADO DE TODOS OS AGENDAMENTOS DO BANCO ===");
+      data?.forEach((agendamento, index) => {
+        console.log(`📋 Agendamento ${index + 1}:`, {
+          id: agendamento.id,
+          user_id: agendamento.user_id,
+          data: agendamento.data,
+          horario: agendamento.horario,
+          status: agendamento.status,
+          payment_id: agendamento.payment_id,
+          payment_status: agendamento.payment_status,
+          valor: agendamento.valor,
+          descricao: agendamento.descricao,
+          cliente_nome: agendamento.cliente_nome,
+          cliente_email: agendamento.cliente_email,
+          cliente_telefone: agendamento.cliente_telefone,
+          qr_code_pix: agendamento.qr_code_pix,
+          copy_paste_pix: agendamento.copy_paste_pix,
+          pix_expires_at: agendamento.pix_expires_at,
+          calendar_event_id: agendamento.calendar_event_id,
+          google_meet_link: agendamento.google_meet_link,
+          created_at: agendamento.created_at,
+          updated_at: agendamento.updated_at,
+          // Análises do link
+          google_meet_link_type: typeof agendamento.google_meet_link,
+          google_meet_link_length: agendamento.google_meet_link?.length,
+          google_meet_link_is_empty: agendamento.google_meet_link === "",
+          google_meet_link_is_null: agendamento.google_meet_link === null,
+          google_meet_link_is_undefined: agendamento.google_meet_link === undefined,
+          google_meet_link_trimmed: agendamento.google_meet_link?.trim(),
+          google_meet_link_trimmed_empty: agendamento.google_meet_link?.trim() === "",
+          // Análises do status
+          status_is_confirmed: agendamento.status === "CONFIRMED",
+          has_calendar_event: !!agendamento.calendar_event_id,
+          has_valid_link: agendamento.google_meet_link && agendamento.google_meet_link.trim() !== ""
+        });
+      });
+      console.log("🔍 === FIM DO LOG DETALHADO ===");
+
+      console.log("🔍 Primeiro agendamento (debug):", data?.[0] ? {
+        id: data[0].id,
+        google_meet_link: data[0].google_meet_link,
+        status: data[0].status,
+        hasLink: !!data[0].google_meet_link
+      } : "Nenhum agendamento");
+
       // Transformar dados para o formato esperado pelo frontend
-      const transformedData = data?.map(agendamento => ({
-        id: agendamento.id,
-        data: agendamento.data,
-        horario: agendamento.horario,
-        status: agendamento.status,
-        paymentId: agendamento.payment_id,
-        paymentStatus: agendamento.payment_status,
-        valor: agendamento.valor,
-        descricao: agendamento.descricao,
-        cliente: {
-          nome: agendamento.cliente_nome,
-          email: agendamento.cliente_email,
-          telefone: agendamento.cliente_telefone,
-        },
-        createdAt: agendamento.created_at,
-        qrCodePix: agendamento.qr_code_pix,
-        copyPastePix: agendamento.copy_paste_pix,
-        pixExpiresAt: agendamento.pix_expires_at,
-        calendarEventId: agendamento.calendar_event_id,
-        googleMeetLink: agendamento.google_meet_link,
-        // Incluir dados do pagamento se existir
-        payment: agendamento.payments?.[0] || null
-      })) || [];
+      const transformedData = data?.map(agendamento => {
+        const transformed = {
+          id: agendamento.id,
+          data: agendamento.data,
+          horario: agendamento.horario,
+          status: agendamento.status,
+          paymentId: agendamento.payment_id,
+          paymentStatus: agendamento.payment_status,
+          valor: agendamento.valor,
+          descricao: agendamento.descricao,
+          cliente: {
+            nome: agendamento.cliente_nome,
+            email: agendamento.cliente_email,
+            telefone: agendamento.cliente_telefone,
+          },
+          createdAt: agendamento.created_at,
+          qrCodePix: agendamento.qr_code_pix,
+          copyPastePix: agendamento.copy_paste_pix,
+          pixExpiresAt: agendamento.pix_expires_at,
+          calendarEventId: agendamento.calendar_event_id,
+          googleMeetLink: agendamento.google_meet_link,
+          // Incluir dados do pagamento se existir
+          payment: agendamento.payments?.[0] || null
+        };
+
+        console.log(`🔄 Transformação do agendamento ${agendamento.id}:`, {
+          original_google_meet_link: agendamento.google_meet_link,
+          transformed_google_meet_link: transformed.googleMeetLink,
+          original_status: agendamento.status,
+          transformed_status: transformed.status,
+          original_calendar_event_id: agendamento.calendar_event_id,
+          transformed_calendar_event_id: transformed.calendarEventId
+        });
+
+        return transformed;
+      }) || [];
 
       res.json({
         success: true,
         data: transformedData,
       });
+
+      // Log final do que está sendo enviado para o frontend
+      console.log("📤 === DADOS ENVIADOS PARA O FRONTEND ===");
+      transformedData.forEach((agendamento, index) => {
+        console.log(`📤 Agendamento ${index + 1} enviado:`, {
+          id: agendamento.id,
+          status: agendamento.status,
+          googleMeetLink: agendamento.googleMeetLink,
+          calendarEventId: agendamento.calendarEventId,
+          // Análises finais
+          hasValidLink: agendamento.googleMeetLink && agendamento.googleMeetLink.trim() !== "",
+          statusIsConfirmed: agendamento.status === "CONFIRMED",
+          hasCalendarEvent: !!agendamento.calendarEventId
+        });
+      });
+      console.log("📤 === FIM DOS DADOS ENVIADOS ===");
     } catch (error) {
       console.error("Erro no controller getUserAgendamentos:", error);
       res.status(500).json({

@@ -6,15 +6,36 @@ import { appConfig } from "./config/app";
 const app = createApp();
 const { port } = appConfig;
 
-const server = app.listen(port, 'localhost', () => {
+log(`Starting server on port ${port}...`);
+
+const server = app.listen(port, '0.0.0.0', () => {
   log(`🚀 API server running on port ${port}`);
   log(`📊 Health check: http://localhost:${port}/api/health/status`);
   log(`💬 Messages: http://localhost:${port}/api/message/:name`);
   log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  log(`Server listening callback executed successfully`);
 });
 
 server.on('error', (err) => {
   log(`❌ Server error: ${err.message}`);
+  log(`❌ Error stack: ${err.stack}`);
+  process.exit(1);
+});
+
+server.on('listening', () => {
+  log(`✅ Server is now listening on port ${port}`);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  log(`❌ Uncaught Exception: ${err.message}`);
+  log(`❌ Exception stack: ${err.stack}`);
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  log(`❌ Unhandled Rejection at: ${promise}, reason: ${reason}`);
   process.exit(1);
 });
 

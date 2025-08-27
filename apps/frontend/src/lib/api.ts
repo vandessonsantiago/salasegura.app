@@ -17,28 +17,12 @@ export const CHECKLIST_BASE = apiEndpoint('/checklist');
 
 // Generic authenticated fetch wrapper (optional)
 export async function authJsonFetch(path: string, token: string, init?: RequestInit) {
-  const res = await fetch(apiEndpoint(path), {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...(init?.headers || {})
-    }
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || res.statusText);
-  }
-  return res.json();
-}
-
-// API object with fetch method for consistent usage
-export const api = {
-  async fetch(path: string, init?: RequestInit) {
+  try {
     const res = await fetch(apiEndpoint(path), {
       ...init,
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
         ...(init?.headers || {})
       }
     });
@@ -47,5 +31,37 @@ export const api = {
       throw new Error(text || res.statusText);
     }
     return res.json();
+  } catch (error) {
+    // Trata erros de rede/conectividade
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error('API não está disponível. Verifique se o servidor está rodando.');
+    }
+    throw error;
+  }
+}
+
+// API object with fetch method for consistent usage
+export const api = {
+  async fetch(path: string, init?: RequestInit) {
+    try {
+      const res = await fetch(apiEndpoint(path), {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(init?.headers || {})
+        }
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      return res.json();
+    } catch (error) {
+      // Trata erros de rede/conectividade
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('API não está disponível. Verifique se o servidor está rodando.');
+      }
+      throw error;
+    }
   }
 };

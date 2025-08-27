@@ -9,17 +9,12 @@
     "build": "tsup",
     "check-types": "tsc --noEmit",
     "lint": "eslint src/ --max-warnings 0",
-    "test": "jest --detectOpenHandles",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "test": "jest --detectOpenHandles"
   },
   "jest": {
     "preset": "@repo/jest-presets/node"
   },
   "dependencies": {
-    "@prisma/client": "^6.14.0",
     "@repo/logger": "workspace:*",
     "@supabase/supabase-js": "^2.56.0",
     "@types/luxon": "^3.7.1",
@@ -32,7 +27,6 @@
     "luxon": "^3.7.1",
     "morgan": "^1.10.0",
     "openai": "^5.15.0",
-    "prisma": "^6.14.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

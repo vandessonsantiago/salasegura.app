@@ -8,6 +8,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =====================================================
+// TABELAS ESSENCIAIS (ATIVAS)
+// =====================================================
+
 model User {
   id         String        @id
   email      String        @unique
@@ -20,6 +24,7 @@ model User {
   sessions   UserSession[]
   checklistSessions ChecklistSession[]
   agendamentos Agendamento[]
+  payments    Payment[]
 
   @@map("users")
 }
@@ -54,29 +59,6 @@ model UserSession {
   @@map("user_sessions")
 }
 
-model ActivityLog {
-  id         String   @id @default(uuid())
-  user_id    String?
-  action     String
-  details    Json?
-  ip_address String?
-  user_agent String?
-  created_at DateTime @default(now())
-
-  @@map("activity_logs")
-}
-
-model AppSettings {
-  id         String   @id @default(uuid())
-  key        String   @unique
-  value      String
-  type       String   @default("string")
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@map("app_settings")
-}
-
 model Conversion {
   id           String   @id @default(uuid())
   name         String
@@ -90,9 +72,10 @@ model Conversion {
   @@map("conversions")
 }
 
-// -------------------------------------------------------------
-// Checklist Session & Items
-// -------------------------------------------------------------
+// =====================================================
+// CHECKLIST
+// =====================================================
+
 model ChecklistSession {
   id           String           @id @default(uuid())
   user_id      String
@@ -126,16 +109,17 @@ model ChecklistItem {
   @@map("checklist_items")
 }
 
-// -------------------------------------------------------------
-// Agendamentos
-// -------------------------------------------------------------
+// =====================================================
+// AGENDAMENTOS E PAGAMENTOS
+// =====================================================
+
 model Agendamento {
   id                 String   @id @default(uuid())
   user_id           String
   data              String   // Data no formato YYYY-MM-DD
   horario           String   // Horário no formato HH:mm
   status            String   @default("PENDING")
-  payment_id        String
+  payment_id        String?
   payment_status    String   @default("PENDING")
   valor             Float
   descricao         String
@@ -150,8 +134,53 @@ model Agendamento {
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
   user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  payments          Payment[]
 
   @@index([user_id])
   @@index([data, horario])
   @@map("agendamentos")
+}
+
+model Payment {
+  id             String      @id @default(uuid())
+  asaas_id       String      @unique
+  status         String
+  valor          Float?
+  user_id        String
+  agendamento_id String?
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+  user           User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  agendamento    Agendamento? @relation(fields: [agendamento_id], references: [id], onDelete: Cascade)
+
+  @@index([asaas_id])
+  @@index([agendamento_id])
+  @@map("payments")
+}
+
+// =====================================================
+// TABELAS DE CONFIGURAÇÃO (MANTIDAS)
+// =====================================================
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  user_id    String?
+  action     String
+  details    Json?
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+
+  @@map("activity_logs")
+}
+
+model AppSettings {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String
+  type       String   @default("string")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("app_settings")
 }

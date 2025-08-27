@@ -33,7 +33,16 @@ export class AgendamentosController {
       console.log("📡 Consultando tabela agendamentos para user:", userId);
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("*")
+        .select(`
+          *,
+          payments (
+            id,
+            asaas_id,
+            status,
+            valor,
+            created_at
+          )
+        `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -48,9 +57,35 @@ export class AgendamentosController {
       }
 
       console.log("✅ Agendamentos encontrados:", data?.length || 0);
+
+      // Transformar dados para o formato esperado pelo frontend
+      const transformedData = data?.map(agendamento => ({
+        id: agendamento.id,
+        data: agendamento.data,
+        horario: agendamento.horario,
+        status: agendamento.status,
+        paymentId: agendamento.payment_id,
+        paymentStatus: agendamento.payment_status,
+        valor: agendamento.valor,
+        descricao: agendamento.descricao,
+        cliente: {
+          nome: agendamento.cliente_nome,
+          email: agendamento.cliente_email,
+          telefone: agendamento.cliente_telefone,
+        },
+        createdAt: agendamento.created_at,
+        qrCodePix: agendamento.qr_code_pix,
+        copyPastePix: agendamento.copy_paste_pix,
+        pixExpiresAt: agendamento.pix_expires_at,
+        calendarEventId: agendamento.calendar_event_id,
+        googleMeetLink: agendamento.google_meet_link,
+        // Incluir dados do pagamento se existir
+        payment: agendamento.payments?.[0] || null
+      })) || [];
+
       res.json({
         success: true,
-        data: data || [],
+        data: transformedData,
       });
     } catch (error) {
       console.error("Erro no controller getUserAgendamentos:", error);

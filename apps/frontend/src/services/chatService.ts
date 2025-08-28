@@ -29,16 +29,19 @@ import { apiEndpoint } from '@/lib/api';
 const CHAT_ENDPOINT = apiEndpoint('/chat');
 
 export class ChatService {
-  static async sendMessage(message: string, chatHistory: ChatMessage[]): Promise<ChatResponse> {
+  static async sendMessage(message: string, chatHistory: ChatMessage[], token?: string): Promise<ChatResponse> {
     try {
       console.log('🚀 Enviando mensagem para API:', { message, historyLength: chatHistory.length });
       
   // Backend expõe rota POST /api/v1/chat
+  const headers: Record<string,string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           message,
           chatHistory: chatHistory.map(msg => ({

@@ -1,5 +1,7 @@
 import express, { Router } from 'express';
 import OpenAI from 'openai';
+import { ChatController } from '../controllers/ChatController';
+import { authenticateToken } from '../middleware/auth';
 
 const router: Router = express.Router();
 
@@ -116,10 +118,9 @@ function detectConversionIntent(
     };
   }
 
-  // Se é a segunda interação (após o usuário responder as perguntas iniciais),
-  // ativar conversão automaticamente
-  if (chatHistory.length >= 1) {
-    console.log('✅ Segunda interação ou mais - ativar conversão automaticamente');
+  // Só ativar conversão após duas respostas do usuário (duas perguntas iniciais respondidas)
+  if (chatHistory.length >= 2) {
+    console.log('✅ Conversão ativada após duas respostas iniciais');
     return {
       shouldConvert: true,
       contactData: { email: '', whatsapp: '' },
@@ -239,26 +240,51 @@ router.post('/', async (req, res) => {
       throw new Error('Chave da API OpenAI não configurada');
     }
 
-    // Detectar intenção de conversão
-    const shouldConvert = detectConversionIntent(message, chatHistory);
+    // Detectar intenção de conversão somente para usuários não autenticados
+    const isAuthenticatedRequest = !!req.headers?.authorization;
+    if (isAuthenticatedRequest) {
+      console.log('🔒 Requisição autenticada detectada - pular detecção de conversão');
+    }
+    const shouldConvert = isAuthenticatedRequest ? { shouldConvert: false, contactData: { email: '', whatsapp: '' } } : detectConversionIntent(message, chatHistory);
     const contactData = extractContactData(message);
 
-    console.log('🔍 Detecção de conversão:', {
-      shouldConvert,
-      contactData,
-      message: message,
+    // Adicionando logs detalhados para diagnóstico
+    console.log('🔍 Diagnóstico de Requisição:', {
+      isAuthenticatedRequest,
+      message,
       chatHistoryLength: chatHistory.length,
     });
+
+    if (!isAuthenticatedRequest) {
+      const conversionIntent = detectConversionIntent(message, chatHistory);
+      console.log('🔍 Resultado de detectConversionIntent:', conversionIntent);
+    } else {
+      console.log('🔒 Requisição autenticada - ignorando detecção de conversão');
+    }
+
+    // Validando resultado de shouldConvert
+    console.log('🔍 Estado de shouldConvert:', shouldConvert);
 
     // Construir mensagens para OpenAI
     const messages = buildMessages({ message, chatHistory });
 
-    console.log('🤖 Chamando OpenAI...');
+    // Ajustando lógica para usar OpenAI com prompts específicos para cada contexto
+    let openAIPrompt;
 
-    // Chamar API da OpenAI
+    if (!isAuthenticatedRequest) {
+      console.log('🔓 Requisição não autenticada - ajustando prompt para conversão');
+      openAIPrompt = `Você é um assistente especializado em guiar usuários para conversões. Responda de forma acolhedora e incentive o preenchimento do formulário para que possamos oferecer suporte adequado. Mensagem do usuário: "${message}"`;
+    } else {
+      console.log('🔒 Requisição autenticada - ajustando prompt para contexto jurídico');
+      openAIPrompt = `Você é um assistente jurídico especializado em direito de família. Responda de forma técnica e clara às questões apresentadas pelo usuário. Mensagem do usuário: "${message}"`;
+    }
+
+    console.log('🤖 Chamando OpenAI com prompt:', openAIPrompt);
+
+    // Chamar API da OpenAI com o prompt ajustado
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: messages,
+      messages: [{ role: 'system', content: openAIPrompt }],
       max_tokens: 400,
       temperature: 0.6,
     });
@@ -269,48 +295,98 @@ router.post('/', async (req, res) => {
 
     console.log('✅ Resposta da OpenAI:', finalResponse.substring(0, 100) + '...');
 
-    // Se detectou conversão, usar resposta específica sobre a Sala Segura
-    if (shouldConvert.shouldConvert) {
-      console.log('🎯 Usando resposta contextualizada');
+    // Adicionando lógica para identificar mensagens que precisam de respostas jurídicas
+    const isLegalContext = (message: string): boolean => {
+      const legalKeywords = ['divórcio', 'alimentos', 'direito de família', 'guarda', 'pensão'];
+      return legalKeywords.some((keyword) => message.toLowerCase().includes(keyword));
+    };
 
-      // Verificar se menciona "sem filhos"
-      const mentionsNoChildren =
-        message.toLowerCase().includes('sem filhos') ||
-        message.toLowerCase().includes('não tem filhos') ||
-        chatHistory.some((msg) => msg.content.toLowerCase().includes('sem filhos'));
+    // Verificar se a mensagem é de contexto jurídico
+    const isLegalMessage = isLegalContext(message);
 
-      if (mentionsNoChildren) {
-        finalResponse = `Agradeço pelas informações que você compartilhou. Entendo que essa situação pode ser complexa mesmo sem filhos envolvidos.
+    // Ajustando lógica para priorizar conversão em chats não autenticados
+    if (!isAuthenticatedRequest) {
+      console.log('🔓 Requisição não autenticada - restaurando fluxo de conversão');
 
-Para tornar esse momento mais organizado e seguro, nosso escritório desenvolveu a Sala Segura: um espaço digital pensado para acompanhar cada etapa do processo de divórcio e reorganização familiar. Nela, você encontrará:
+      const conversionResponse = await detectConversionIntent(message, chatHistory);
 
-• Checklists práticos para não esquecer nenhum detalhe
-• Armazenamento protegido de documentos
-• Modelos e apoio na elaboração de acordos
-• Acompanhamento claro de todas as fases, seja judicial ou extrajudicial
-
-O acesso é totalmente gratuito, e você só paga pelos serviços jurídicos que realmente precisar.
-
-Para começar, basta preencher o formulário que aparecerá em seguida. Logo depois, você será direcionado para criar sua senha e entrar na Sala Segura. A partir daí, poderá explorar os recursos disponíveis com tranquilidade — e estarei ao seu lado para esclarecer dúvidas sempre que necessário.`;
+      if (conversionResponse.shouldConvert) {
+        console.log('🎯 Fluxo de conversão acionado');
+        finalResponse = `Entendemos que este é um momento importante para você. Para ajudar, criamos um espaço digital chamado Sala Segura, onde você pode organizar e simplificar processos relacionados à sua situação. Por favor, preencha o formulário que aparecerá em seguida para que possamos oferecer o suporte necessário.`;
       } else {
-        finalResponse = `Agradeço pelas informações que você compartilhou. Sei que lidar com essa situação, especialmente quando há filhos menores envolvidos, pode ser desafiador e trazer muitas preocupações emocionais e práticas.
+        console.log('🔄 Mensagem genérica - chamando OpenAI para resposta ajustada');
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'system', content: `Você é um assistente especializado em guiar usuários para conversões. Responda de forma acolhedora e incentive o preenchimento do formulário. Mensagem do usuário: "${message}"` }],
+          max_tokens: 400,
+          temperature: 0.6,
+        });
 
-Para tornar esse momento mais organizado e seguro, nosso escritório desenvolveu a Sala Segura: um espaço digital pensado para acompanhar cada etapa do processo de divórcio e reorganização familiar. Nela, você encontrará:
-
-• Checklists práticos para não esquecer nenhum detalhe
-• Armazenamento protegido de documentos
-• Modelos e apoio na elaboração de acordos
-• Acompanhamento claro de todas as fases, seja judicial ou extrajudicial
-
-O acesso é totalmente gratuito, e você só paga pelos serviços jurídicos que realmente precisar.
-
-Para começar, basta preencher o formulário que aparecerá em seguida. Logo depois, você será direcionado para criar sua senha e entrar na Sala Segura. A partir daí, poderá explorar os recursos disponíveis com tranquilidade — e estarei ao seu lado para esclarecer dúvidas sempre que necessário.`;
+        finalResponse =
+          completion.choices[0]?.message?.content ||
+          'Desculpe, não consegui processar sua mensagem.';
       }
+    } else if (isAuthenticatedRequest) {
+      console.log('🔒 Requisição autenticada - verificando contexto da mensagem');
 
-      console.log('✅ Resposta contextualizada gerada');
-    } else {
-      console.log('❌ Não detectou conversão, usando resposta da OpenAI');
+      if (message.toLowerCase().includes('como essa página pode me ajudar')) {
+        console.log('⚖️ Mensagem genérica identificada - fornecendo contexto jurídico');
+        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
+      } else if (isLegalMessage) {
+        console.log('⚖️ Mensagem identificada como contexto jurídico');
+        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
+      } else {
+        console.log('❌ Não detectou conversão, usando resposta da OpenAI');
+        // ...existing OpenAI response logic...
+      }
     }
+
+    // Restaurando fluxo de qualificação e apresentação para chat não autenticado
+    if (!isAuthenticatedRequest) {
+      console.log('🔓 Requisição não autenticada - iniciando fluxo de qualificação');
+
+      const qualificationQuestions = [
+        'Qual é o tipo de vínculo que você possui (casamento ou união estável)?',
+        'Existem filhos menores envolvidos?'
+      ];
+
+      if (chatHistory.length < qualificationQuestions.length) {
+        finalResponse = qualificationQuestions[chatHistory.length];
+      } else {
+        console.log('🎯 Qualificação concluída - apresentando aplicação');
+        finalResponse = `Entendemos que este é um momento importante para você. Para ajudar, criamos um espaço digital chamado Sala Segura, onde você pode organizar e simplificar processos relacionados à sua situação. Por favor, preencha o formulário que aparecerá em seguida para que possamos oferecer o suporte necessário.`;
+
+        // Simulando envio do formulário no chat
+        // Ajustando o tipo do formulário para corresponder à interface ChatMessage
+        const formMessage: ChatMessage = {
+          id: Date.now().toString(),
+          content: 'Aqui está o formulário de acesso: [Formulário de Acesso](#)',
+          type: 'assistant', // Corrigido para usar apenas propriedades válidas
+          timestamp: new Date()
+        };
+        chatHistory.push(formMessage);
+      }
+    } else if (isAuthenticatedRequest) {
+      console.log('🔒 Requisição autenticada - verificando contexto da mensagem');
+
+      if (message.toLowerCase().includes('como essa página pode me ajudar')) {
+        console.log('⚖️ Mensagem genérica identificada - fornecendo contexto jurídico');
+        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
+      } else if (isLegalMessage) {
+        console.log('⚖️ Mensagem identificada como contexto jurídico');
+        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
+      } else {
+        console.log('❌ Não detectou conversão, usando resposta da OpenAI');
+        // ...existing OpenAI response logic...
+      }
+    }
+
+    // Adicionando log para verificar resposta final
+    console.log('📤 Resposta final gerada:', {
+      finalResponse: finalResponse.substring(0, 100), // Limitar tamanho do log
+      shouldConvert: shouldConvert.shouldConvert,
+      conversionData: shouldConvert.shouldConvert ? contactData : null,
+    });
 
     const responseData = {
       response: finalResponse,
@@ -363,5 +439,11 @@ router.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Rotas REST para chat autenticado
+router.get('/conversations', authenticateToken, ChatController.getUserConversations);
+router.post('/conversations', authenticateToken, ChatController.createConversation);
+router.get('/conversations/:id/messages', authenticateToken, ChatController.getConversationMessages);
+router.post('/conversations/:id/messages', authenticateToken, ChatController.addMessage);
 
 export default router;

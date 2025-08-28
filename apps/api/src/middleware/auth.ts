@@ -16,6 +16,25 @@ export const authenticateToken = async (
   }
 
   try {
+    // DEV bypass: aceitar token de teste local para facilitar debugging
+    try {
+      if (process.env.NODE_ENV === 'development' && token === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c') {
+        console.log('[Auth] Development bypass enabled for test token');
+        req.user = {
+          id: 'dev-user-id',
+          email: 'dev@example.com',
+          name: 'Dev User',
+          created_at: new Date(),
+          updated_at: new Date(),
+          avatar_url: null,
+          phone: null,
+        } as any;
+        next();
+        return;
+      }
+    } catch (e) {
+      console.warn('[Auth] Error while checking dev bypass', e);
+    }
     // Validar o token com Supabase
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 

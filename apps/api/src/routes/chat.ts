@@ -445,5 +445,6 @@ router.get('/conversations', authenticateToken, ChatController.getUserConversati
 router.post('/conversations', authenticateToken, ChatController.createConversation);
 router.get('/conversations/:id/messages', authenticateToken, ChatController.getConversationMessages);
 router.post('/conversations/:id/messages', authenticateToken, ChatController.addMessage);
+router.delete('/conversations/:id', authenticateToken, ChatController.deleteConversation);
 
 export default router;

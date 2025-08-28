@@ -72,4 +72,38 @@ export class ChatController {
 		if (error) return res.status(500).json({ success: false, error: error.message });
 		return res.status(201).json({ success: true, data });
 	}
+
+	// Deletar uma conversa
+	static async deleteConversation(req: Request, res: Response) {
+		const userId = req.user?.id;
+		const conversationId = req.params.id;
+
+		if (!userId) {
+			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+		}
+
+		// Verifica se a conversa pertence ao usuário
+		const { data: conv, error: convErr } = await supabase
+			.from('chat_conversations')
+			.select('id')
+			.eq('id', conversationId)
+			.eq('user_id', userId)
+			.single();
+
+		if (convErr || !conv) {
+			return res.status(404).json({ success: false, error: 'Conversa não encontrada' });
+		}
+
+		// Deleta a conversa
+		const { error: deleteErr } = await supabase
+			.from('chat_conversations')
+			.delete()
+			.eq('id', conversationId);
+
+		if (deleteErr) {
+			return res.status(500).json({ success: false, error: deleteErr.message });
+		}
+
+		return res.json({ success: true, message: 'Conversa deletada com sucesso' });
+	}
 }

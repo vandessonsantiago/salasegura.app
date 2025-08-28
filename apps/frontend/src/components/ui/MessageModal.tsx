@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useChatStorage, ChatSession } from "@/hooks/useChatStorage";
+import { useAuth } from '@/contexts/AuthContext';
+import { useAuthenticatedChatStorage, AuthChatConversation } from '@/hooks/useAuthenticatedChatStorage';
 
 interface MessageModalProps {
   isOpen: boolean;
@@ -11,14 +13,52 @@ interface MessageModalProps {
 
 export default function MessageModal({ isOpen, onClose, onLoadSession }: MessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const { sessions, searchSessions, deleteSession, clearAllSessions } = useChatStorage();
+  const { user, session } = useAuth();
+  const isAuthenticated = !!user && !!session?.access_token;
+  const authChat = useAuthenticatedChatStorage(session?.access_token || "");
+
+  const {
+    sessions: localSessions,
+    searchSessions: searchLocalSessions,
+    deleteSession: deleteLocalSession,
+    clearAllSessions: clearAllLocalSessions
+  } = useChatStorage();
+
   const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
 
   // Filtrar sessões baseado na busca
   useEffect(() => {
-    const filtered = searchSessions(searchQuery);
-    setFilteredSessions(filtered);
-  }, [searchQuery, sessions, searchSessions]);
+    if (isOpen && isAuthenticated) {
+      let isMounted = true;
+      const fetchConversations = async () => {
+        try {
+          const conversations = await authChat.fetchConversations();
+          if (isMounted) {
+            const filtered = conversations.map((conversation: AuthChatConversation) => ({
+              id: conversation.id,
+              title: `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
+              messages: [],
+              flow: 'free' as ChatSession['flow'], // Explicitly cast to match ChatSession type
+              createdAt: new Date(conversation.created_at),
+              updatedAt: new Date(conversation.updated_at),
+            })).filter((conversation: { title: string }) =>
+              conversation.title.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            setFilteredSessions(filtered);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar conversas:', error);
+        }
+      };
+      fetchConversations();
+      return () => {
+        isMounted = false;
+      };
+    } else if (!isAuthenticated) {
+      const filtered = searchLocalSessions(searchQuery);
+      setFilteredSessions(filtered);
+    }
+  }, [isOpen, isAuthenticated, searchQuery, searchLocalSessions]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -36,7 +76,29 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (confirm('Tem certeza que deseja excluir esta conversa?')) {
-      deleteSession(sessionId);
+      if (isAuthenticated) {
+        console.warn('deleteConversation is not implemented in useAuthenticatedChatStorage');
+      } else {
+        deleteLocalSession(sessionId);
+      }
+    }
+  };
+
+  const clearAllSessions = async () => {
+    if (confirm('Tem certeza que deseja limpar todas as conversas?')) {
+      if (isAuthenticated) {
+        try {
+          const conversations = await authChat.fetchConversations();
+          for (const conversation of conversations) {
+            await authChat.deleteConversation(conversation.id);
+          }
+          setFilteredSessions([]); // Atualiza a UI após limpar as conversas
+        } catch (error) {
+          console.error('Erro ao limpar conversas do banco de dados:', error);
+        }
+      } else {
+        clearAllLocalSessions();
+      }
     }
   };
 
@@ -81,13 +143,9 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Conversas Salvas</h2>
-          {sessions.length > 0 && (
+          {localSessions.length > 0 && (
             <button
-              onClick={() => {
-                if (confirm('Tem certeza que deseja limpar todas as conversas?')) {
-                  clearAllSessions();
-                }
-              }}
+              onClick={clearAllSessions}
               className="text-red-500 hover:text-red-700 text-sm transition-colors"
             >
               Limpar Tudo

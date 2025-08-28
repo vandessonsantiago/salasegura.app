@@ -141,5 +141,31 @@ export function useAuthenticatedChatStorage(token: string) {
     }
   }, [token]);
 
-  return { conversations, messages, fetchConversations, createConversation, fetchMessages, addMessage };
+  // Deletar conversa
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    try {
+      const url = apiEndpoint(`/chat/conversations/${conversationId}`);
+      console.log('useAuthenticatedChatStorage.deleteConversation calling URL:', url, { conversationId });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        if (res.status === 404) {
+          console.warn('useAuthenticatedChatStorage.deleteConversation: Conversation not found', { status: res.status, body, conversationId });
+        } else {
+          console.warn('useAuthenticatedChatStorage.deleteConversation: non-ok response', { status: res.status, body, conversationId });
+        }
+        return false;
+      }
+      console.log('useAuthenticatedChatStorage.deleteConversation: success', { conversationId });
+      return true;
+    } catch (err) {
+      console.error('deleteConversation error', { error: err, conversationId });
+      return false;
+    }
+  }, [token]);
+
+  return { conversations, messages, fetchConversations, createConversation, fetchMessages, addMessage, deleteConversation };
 }

@@ -1,4 +1,4 @@
-import { User } from '../generated/prisma';
+import { User } from '../generated/supabase';
 
 declare global {
   namespace Express {

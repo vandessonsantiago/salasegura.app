@@ -6,6 +6,7 @@ import agendamentosRoutes from "./agendamentos";
 import availableSlotsRoutes from "./availableSlots";
 import checkoutRoutes from "./checkout";
 import asaasWebhookRoutes from "./asaasWebhook";
+import divorcioRoutes from "./divorcioRoutes";
 
 const router: Router = Router();
 
@@ -17,6 +18,7 @@ router.use("/agendamentos", agendamentosRoutes);
 router.use("/available-slots", availableSlotsRoutes);
 router.use("/checkout", checkoutRoutes);
 router.use("/asaas-webhook", asaasWebhookRoutes);
+router.use("/divorcio", divorcioRoutes);
 
 // Rota de status legada (mantendo compatibilidade)
 router.get("/status", (req, res) => {

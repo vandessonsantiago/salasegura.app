@@ -1,10 +1,8 @@
 import express, { Request, Response, Router } from "express";
 import crypto from "crypto";
 import { supabaseAdmin as supabase } from "../lib/supabase";
-import { PrismaClient } from "../generated/prisma";
 
 const router: Router = express.Router();
-const prisma = new PrismaClient();
 
 interface ConversionRequest {
   name: string;
@@ -12,14 +10,15 @@ interface ConversionRequest {
   whatsapp: string;
 }
 
+// Revisando e ajustando o tipo ConversionData para alinhar com a tabela no Supabase
 interface ConversionData {
-  id: string;
+  id: string; // Campo obrigatório gerado pelo Supabase
   name: string;
   email: string;
   whatsapp: string;
   access_token: string;
   status: 'pending' | 'completed';
-  created_at: string;
+  created_at: string; // Campo obrigatório gerado pelo Supabase
 }
 
 /**
@@ -102,22 +101,26 @@ router.post('/', async (req: Request, res: Response) => {
     const accessToken = crypto.randomBytes(32).toString("hex");
     console.log('📧 Token gerado:', accessToken.substring(0, 8) + '...');
 
-    // Inserir dados na tabela conversions usando Prisma
-    console.log('💾 Inserindo conversão via Prisma...');
+    // Inserir dados na tabela conversions usando Supabase
+    console.log('💾 Inserindo conversão via Supabase...');
     
     try {
-      const conversion = await prisma.conversion.create({
-        data: {
-          name,
-          email,
-          whatsapp,
-          access_token: accessToken,
-          status: 'pending'
-        }
-      });
+      const { data: conversion, error: insertError } = await supabase
+        .from('conversions')
+        .insert([
+          {
+            name,
+            email,
+            whatsapp,
+            access_token: accessToken,
+            status: 'pending'
+          } as Partial<ConversionData> // Forçando a tipagem explícita como parcial
+        ])
+        .select() // Garantindo que o retorno seja tipado corretamente
+        .single();
 
-      if (!conversion) {
-        console.error('❌ Erro: Conversão não foi criada');
+      if (insertError) {
+        console.error('❌ Erro ao inserir conversão:', insertError);
         return res.status(500).json({
           success: false,
           error: "Erro ao processar conversão",
@@ -139,8 +142,8 @@ router.post('/', async (req: Request, res: Response) => {
         conversionId: conversion.id
       });
 
-    } catch (prismaError) {
-      console.error('❌ Erro do Prisma ao inserir conversão:', prismaError);
+    } catch (error) {
+      console.error('❌ Erro ao inserir conversão:', error);
       return res.status(500).json({
         success: false,
         error: "Erro ao processar conversão",
@@ -173,15 +176,15 @@ router.get('/:token', async (req: Request, res: Response) => {
 
     console.log('🔍 Validando token:', token.substring(0, 8) + '...');
 
-    // Buscar conversão pelo token usando Prisma
-    const conversion = await prisma.conversion.findFirst({
-      where: {
-        access_token: token,
-        status: 'pending'
-      }
-    });
+    // Buscar conversão pelo token usando Supabase
+    const { data: conversion, error: findError } = await supabase
+      .from('conversions')
+      .select('*')
+      .eq('access_token', token)
+      .eq('status', 'pending')
+      .single();
 
-    if (!conversion) {
+    if (findError || !conversion) {
       console.log('❌ Token inválido ou expirado');
       return res.status(404).json({
         success: false,
@@ -230,18 +233,16 @@ router.patch('/:token/complete', async (req: Request, res: Response) => {
 
     console.log('🔄 Marcando conversão como concluída:', token.substring(0, 8) + '...');
 
-    // Atualizar status da conversão usando Prisma
-    const conversion = await prisma.conversion.updateMany({
-      where: {
-        access_token: token,
-        status: 'pending'
-      },
-      data: {
-        status: 'completed'
-      }
-    });
+    // Atualizar status da conversão usando Supabase
+    const { data: conversion, error: updateError } = await supabase
+      .from('conversions')
+      .update({ status: 'completed' })
+      .eq('access_token', token)
+      .eq('status', 'pending')
+      .select()
+      .single();
 
-    if (conversion.count === 0) {
+    if (updateError || !conversion) {
       return res.status(404).json({
         success: false,
         error: "Token inválido ou já utilizado",
@@ -284,14 +285,14 @@ router.post('/:token/signup', async (req: Request, res: Response) => {
     }
 
     // Buscar conversão pelo token
-    const conversion = await prisma.conversion.findUnique({
-      where: { 
-        access_token: token,
-        status: 'pending' // Apenas conversões pendentes
-      }
-    });
+    const { data: conversion, error: findError } = await supabase
+      .from('conversions')
+      .select('*')
+      .eq('access_token', token)
+      .eq('status', 'pending')
+      .single();
 
-    if (!conversion) {
+    if (findError || !conversion) {
       return res.status(404).json({
         success: false,
         error: "Token inválido ou já utilizado",
@@ -330,10 +331,10 @@ router.post('/:token/signup', async (req: Request, res: Response) => {
     console.log('✅ Usuário criado com sucesso:', authData.user?.id);
 
     // Marcar conversão como concluída
-    await prisma.conversion.update({
-      where: { id: conversion.id },
-      data: { status: 'completed' }
-    });
+    await supabase
+      .from('conversions')
+      .update({ status: 'completed' })
+      .eq('id', conversion.id);
 
     res.json({
       success: true,

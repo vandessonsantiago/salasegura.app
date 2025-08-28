@@ -5,6 +5,7 @@ import CardHero from './CardHero';
 import dynamic from 'next/dynamic';
 import { useChecklist } from '@/contexts/ChecklistContext';
 import { useAgendamentos } from '@/contexts/AgendamentosContext';
+import DivorcioExpressModal from '@/components/modals/DivorcioExpressModal';
 
 // Carregar modais dinamicamente (evita SSR issues com window)
 const ChecklistModal = dynamic(() => import('@/components/modals/ChecklistModal'), { ssr: false });
@@ -16,6 +17,7 @@ export default function Hero() {
   const [showChecklist, setShowChecklist] = useState(false);
   const [showAgendamento, setShowAgendamento] = useState(false);
   const [showMeusAgendamentos, setShowMeusAgendamentos] = useState(false);
+  const [showDivorcioExpressModal, setShowDivorcioExpressModal] = useState(false);
   const { sessions, currentSession } = useChecklist();
   const { hasConsultas, getLatestConsulta, formatStatus, formatDate, loading } = useAgendamentos();
 
@@ -66,7 +68,7 @@ export default function Hero() {
             {/* Card 2 - Divórcio Express */}
             <CardHero
               icon={<Users size={22} />}
-              title="Divórcio Express - Solução para casais sem filhos"
+              title="Divórcio Express - Simples e 100% guiado"
               price={{
                 original: "R$ 1.450,00",
                 current: "R$ 759,00"
@@ -74,7 +76,7 @@ export default function Hero() {
               button={{
                 text: "RESOLVER AGORA",
                 variant: "primary",
-                onClick: () => console.log('Divórcio clicked')
+                onClick: () => setShowDivorcioExpressModal(true)
               }}
               highlight={true}
             />
@@ -169,6 +171,10 @@ export default function Hero() {
           }}
         />
       )}
+      <DivorcioExpressModal
+        isOpen={showDivorcioExpressModal}
+        onClose={() => setShowDivorcioExpressModal(false)}
+      />
     </section>
   );
 }

@@ -167,5 +167,20 @@ END $$;
 -- 🎯 RESUMO:
 -- Execute primeiro o Script 1 (verificação) para ver suas tabelas
 -- Depois execute o Script 2 (limpeza) se quiser remover opcionais
--- Suas tabelas essenciais estarão sempre seguras!</content>
-<parameter name="filePath">/Users/vandessonsantiago/Documents/salasegura/database_cleanup.sql
+-- Suas tabelas essenciais estarão sempre seguras!
+
+-- Criar tabela para armazenar casos de divórcio
+CREATE TABLE IF NOT EXISTS divorce_cases (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'draft',
+    type TEXT NOT NULL CHECK (type IN ('extrajudicial', 'judicial')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Índice para melhorar consultas por usuário
+CREATE INDEX IF NOT EXISTS idx_divorce_cases_user_id ON divorce_cases (user_id);
+
+-- Índice para melhorar consultas por status
+CREATE INDEX IF NOT EXISTS idx_divorce_cases_status ON divorce_cases (status);

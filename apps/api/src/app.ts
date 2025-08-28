@@ -1,5 +1,5 @@
-import { json, urlencoded } from "body-parser";
-import { type Express, Request, Response } from "express";
+import express from 'express';
+import { Request, Response } from 'express';
 import morgan from "morgan";
 import cors from "cors";
 import routes from "./routes";
@@ -10,17 +10,16 @@ import conversionsRoutes from "./routes/conversions";
 import dashboardChatRoutes from "./routes/dashboardChat";
 import checklistRoutes from "./routes/checklist";
 import { errorHandler } from "./middleware/errorHandler";
-import express from 'express';
 import { requestLogger } from "./middleware/requestLogger";
 
-export const createApp = (): Express => {
+export const createApp = (): express.Express => {
   const app = express();
 
   // Middleware básicos
   app.disable("x-powered-by");
   app.use(morgan("dev"));
-  app.use(urlencoded({ extended: true }));
-  app.use(json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json());
   
   // CORS configurado para aceitar o frontend
   app.use(cors({
@@ -32,17 +31,6 @@ export const createApp = (): Express => {
 
   // Middleware customizado de logging
   app.use(requestLogger);
-
-  // ------------------------------------------------------------------
-  // Rotas (LEGADO) sem versão - manter temporariamente para compatibilidade
-  // ------------------------------------------------------------------
-  app.use("/api/auth", authRoutes);
-  app.use("/api/user", protectedRoutes);
-  app.use("/api/chat", chatRoutes);
-  app.use("/api/dashboard-chat", dashboardChatRoutes);
-  app.use("/api/conversions", conversionsRoutes);
-  app.use("/api/checklist", checklistRoutes);
-  app.use("/api", routes);
 
   // ------------------------------------------------------------------
   // Rotas versão 1 (novo padrão): /api/v1/*
@@ -57,8 +45,12 @@ export const createApp = (): Express => {
   app.use("/api/v1", routes); // inclui /health, /message, etc.
 
   // Rotas de compatibilidade (mantendo as antigas rotas no root)
-  app.get("/status", (req: Request, res: Response) => res.redirect("/api/health/status"));
-  app.get("/message/:name", (req: Request, res: Response) => res.redirect(`/api/message/${req.params.name}`));
+  app.get("/status", (req: Request, res: Response) => {
+    res.redirect("/api/health/status");
+  });
+  app.get("/message/:name", (req: Request, res: Response) => {
+    res.redirect(`/api/message/${req.params.name}`);
+  });
 
   // Middleware de tratamento de erros (deve ser o último)
   app.use(errorHandler);

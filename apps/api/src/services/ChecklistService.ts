@@ -1,6 +1,6 @@
-import { PrismaClient } from "../generated/prisma";
+import { createClient } from '@supabase/supabase-js';
 
-const prisma = new PrismaClient();
+const supabase = createClient('https://your-supabase-url.supabase.co', 'public-anon-key');
 
 export interface ChecklistTemplateItem { item_id: string; category: string; text: string; }
 const CURRENT_TEMPLATE_VERSION = 2;
@@ -70,174 +70,177 @@ const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
 
 export class ChecklistService {
   static async listSessions(userId: string) {
-    return prisma.checklistSession.findMany({
-      where: { user_id: userId },
-      orderBy: { created_at: "desc" },
-      select: {
-        id: true,
-        user_id: true,
-        title: true,
-        progress: true,
-        total_items: true,
-        template_version: true,
-        completed_at: true,
-        created_at: true,
-        updated_at: true,
-      },
-    });
+    const { data, error } = await supabase
+      .from('checklistSession')
+      .select(`
+        id,
+        user_id,
+        title,
+        progress,
+        total_items,
+        template_version,
+        completed_at,
+        created_at,
+        updated_at
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   static async getSessionWithItems(userId: string, sessionId: string) {
-    let session = await prisma.checklistSession.findFirst({
-      where: { id: sessionId, user_id: userId },
-      include: { items: true },
-    });
+    let { data: session, error } = await supabase
+      .from('checklistSession')
+      .select('*, items(*)')
+      .eq('id', sessionId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) throw new Error(error.message);
     if (!session) return null;
 
     // Backfill / upgrade se sessão está vazia ou usando template antigo
     const needsUpgrade = session.template_version === undefined || session.template_version < CURRENT_TEMPLATE_VERSION;
     if (session.items.length === 0 || needsUpgrade) {
-      await prisma.$transaction(async (tx) => {
-        // Rechecar dentro da transação para evitar corrida
-        const again = await tx.checklistSession.findUnique({
-          where: { id: sessionId },
-          include: { items: true },
-        });
-        if (again) {
-          const existingIds = new Set(again.items.map(i => i.item_id));
-          const missing = CHECKLIST_TEMPLATE.filter(i => !existingIds.has(i.item_id));
-          if (missing.length > 0) {
-            await tx.checklistItem.createMany({
-              data: missing.map(i => ({
-                session_id: again.id,
-                item_id: i.item_id,
-                category: i.category,
-                text: i.text,
-              })),
-            });
-          }
-          await tx.checklistSession.update({
-            where: { id: again.id },
-            data: { total_items: CHECKLIST_TEMPLATE.length, template_version: CURRENT_TEMPLATE_VERSION },
-          });
-        }
-      });
+      await supabase
+        .from('checklistItem')
+        .insert(
+          CHECKLIST_TEMPLATE
+            .filter(i => !session.items.map((item: any) => item.item_id).includes(i.item_id))
+            .map(i => ({
+              session_id: session.id,
+              item_id: i.item_id,
+              category: i.category,
+              text: i.text,
+            }))
+        );
+
+      await supabase
+        .from('checklistSession')
+        .update({
+          total_items: CHECKLIST_TEMPLATE.length,
+          template_version: CURRENT_TEMPLATE_VERSION,
+        })
+        .eq('id', session.id);
+      
       // Recarregar com itens agora presentes
-      session = await prisma.checklistSession.findUnique({
-        where: { id: sessionId },
-        include: { items: true },
-      });
+      const { data: updatedSession } = await supabase
+        .from('checklistSession')
+        .select('*, items(*)')
+        .eq('id', sessionId)
+        .single();
+      session = updatedSession;
     }
     return session;
   }
 
   static async createSession(userId: string, title?: string) {
-    return prisma.$transaction(async (tx) => {
-      const existing = await tx.checklistSession.findFirst({
-        where: { user_id: userId, title: { contains: "Checklist" } },
-      });
-      // Não impedir múltiplas, mas normalmente só haverá uma. Podemos simplesmente criar sempre.
-      const session = await tx.checklistSession.create({
-        data: {
-          user_id: userId,
-          title: title || 'Checklist "Você está pronto(a) para o cartório?"',
-          total_items: CHECKLIST_TEMPLATE.length,
-          template_version: CURRENT_TEMPLATE_VERSION,
-        },
-      });
+    const { data: session, error: sessionError } = await supabase
+      .from('checklistSession')
+      .insert({
+        user_id: userId,
+        title: title || 'Checklist "Você está pronto(a) para o cartório?"',
+        total_items: CHECKLIST_TEMPLATE.length,
+        template_version: CURRENT_TEMPLATE_VERSION,
+      })
+      .select()
+      .single();
 
-      await tx.checklistItem.createMany({
-        data: CHECKLIST_TEMPLATE.map((i) => ({
+    if (sessionError) throw new Error(sessionError.message);
+
+    await supabase
+      .from('checklistItem')
+      .insert(
+        CHECKLIST_TEMPLATE.map(i => ({
           session_id: session.id,
           item_id: i.item_id,
           category: i.category,
           text: i.text,
-        })),
-      });
+        }))
+      );
 
-      const full = await tx.checklistSession.findUnique({
-        where: { id: session.id },
-        include: { items: true },
-      });
-      return full;
-    });
+    return this.getSessionWithItems(userId, session.id);
   }
 
   static async updateItem(userId: string, sessionId: string, itemId: string, checked: boolean) {
-    return prisma.$transaction(async (tx) => {
-      // Validar sessão pertence ao usuário
-      const session = await tx.checklistSession.findFirst({
-        where: { id: sessionId, user_id: userId },
-      });
-      if (!session) throw new Error("Session not found");
+    const { data: item, error: itemError } = await supabase
+      .from('checklistItem')
+      .select()
+      .eq('session_id', sessionId)
+      .eq('item_id', itemId)
+      .single();
 
-      const item = await tx.checklistItem.findFirst({
-        where: { session_id: sessionId, item_id: itemId },
-      });
-      if (!item) throw new Error("Item not found");
+    if (itemError) throw new Error(itemError.message);
+    if (!item) throw new Error("Item not found");
 
-      await tx.checklistItem.update({
-        where: { id: item.id },
-        data: { checked },
-      });
+    await supabase
+      .from('checklistItem')
+      .update({ checked })
+      .eq('id', item.id);
 
-      // Recalcular progresso
-      const checkedCount = await tx.checklistItem.count({
-        where: { session_id: sessionId, checked: true },
-      });
+    // Recalcular progresso
+    const { data: updatedSession } = await supabase
+      .from('checklistSession')
+      .select('*, items(*)')
+      .eq('id', sessionId)
+      .single();
 
-      await tx.checklistSession.update({
-        where: { id: sessionId },
-        data: {
-          progress: checkedCount,
-          completed_at: checkedCount === session.total_items ? new Date() : null,
-        },
-      });
+    const checkedCount = updatedSession.items.filter((i: any) => i.checked).length;
 
-      const updated = await tx.checklistSession.findUnique({
-        where: { id: sessionId },
-        include: { items: true },
-      });
-      return updated;
-    });
+    await supabase
+      .from('checklistSession')
+      .update({
+        progress: checkedCount,
+        completed_at: checkedCount === updatedSession.total_items ? new Date() : null,
+      })
+      .eq('id', sessionId);
+
+    return this.getSessionWithItems(userId, sessionId);
   }
 
   static async deleteSession(userId: string, sessionId: string) {
-    return prisma.$transaction(async (tx) => {
-      const session = await tx.checklistSession.findFirst({
-        where: { id: sessionId, user_id: userId },
-      });
-      if (!session) throw new Error("Session not found");
+    const { error: sessionError } = await supabase
+      .from('checklistSession')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', userId);
 
-      await tx.checklistItem.deleteMany({ where: { session_id: sessionId } });
-      await tx.checklistSession.delete({ where: { id: sessionId } });
-      return true;
-    });
+    if (sessionError) throw new Error(sessionError.message);
+
+    return true;
   }
 }
 
 // Função utilitária opcional para backfill manual (pode ser chamada em um script ou rota admin futura)
 export async function backfillAllChecklistSessionsForUser(userId: string) {
-  const sessions = await prisma.checklistSession.findMany({ where: { user_id: userId }, include: { items: true } });
+  const { data: sessions, error } = await supabase
+    .from('checklistSession')
+    .select('*, items(*)')
+    .eq('user_id', userId);
+
+  if (error) throw new Error(error.message);
+
   for (const s of sessions) {
     if (s.items.length === 0) {
-      await prisma.$transaction(async (tx) => {
-        const again = await tx.checklistSession.findUnique({ where: { id: s.id }, include: { items: true } });
-        if (again && again.items.length === 0) {
-          await tx.checklistItem.createMany({
-            data: CHECKLIST_TEMPLATE.map((i) => ({
-              session_id: again.id,
-              item_id: i.item_id,
-              category: i.category,
-              text: i.text,
-            })),
-          });
-          await tx.checklistSession.update({
-            where: { id: again.id },
-            data: { total_items: CHECKLIST_TEMPLATE.length },
-          });
-        }
-      });
+      await supabase
+        .from('checklistItem')
+        .insert(
+          CHECKLIST_TEMPLATE.map(i => ({
+            session_id: s.id,
+            item_id: i.item_id,
+            category: i.category,
+            text: i.text,
+          }))
+        );
+
+      await supabase
+        .from('checklistSession')
+        .update({
+          total_items: CHECKLIST_TEMPLATE.length,
+        })
+        .eq('id', s.id);
     }
   }
   return true;

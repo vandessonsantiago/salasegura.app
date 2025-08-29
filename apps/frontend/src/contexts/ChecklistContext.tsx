@@ -47,7 +47,7 @@ interface ChecklistContextType {
 
 const ChecklistContext = createContext<ChecklistContextType | undefined>(undefined);
 
-// Ajuste de porta: backend padrão roda em 3001 (ver appConfig.port)
+// Ajuste de porta: backend padrão roda em 8001 (ver appConfig.port)
 
 async function authFetch(path: string, token: string, init?: RequestInit) {
   const base = CHECKLIST_BASE; // http://.../api/v1/checklist
@@ -112,6 +112,11 @@ export function ChecklistProvider({ children }: { children: ReactNode }) {
       setCurrentSession(data.session);
       return data.session;
     } catch (e: any) {
+      console.error('Erro ao carregar sessão:', e);
+      // Se a sessão não for encontrada, não definir erro para permitir fallback
+      if (e.message?.includes('not found') || e.message?.includes('404')) {
+        return null;
+      }
       setError('Erro ao carregar sessão');
       return null;
     } finally {
@@ -140,19 +145,33 @@ export function ChecklistProvider({ children }: { children: ReactNode }) {
 
   const updateItem = useCallback(async (sessionId: string, itemId: string, checked: boolean) => {
     if (!token) return false;
+
     try {
       const data = await authFetch(`/sessions/${sessionId}/items/${itemId}`, token, {
         method: 'PUT',
         body: JSON.stringify({ checked })
       });
+
       const updated = data.session as ChecklistSessionWithItems;
-      setCurrentSession(updated);
-      setSessions(prev => prev.map(s => s.id === updated.id ? { ...s, progress: updated.progress, total_items: updated.total_items } : s));
+
+      // Atualizar apenas a sessão atual se for a mesma que está sendo editada
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(updated);
+      }
+
+      // Atualizar a lista de sessões apenas com as informações básicas
+      setSessions(prev => prev.map(s =>
+        s.id === updated.id
+          ? { ...s, progress: updated.progress, total_items: updated.total_items, updated_at: updated.updated_at }
+          : s
+      ));
+
       return true;
     } catch (e) {
+      console.error('Erro ao atualizar item:', e);
       return false;
     }
-  }, [token]);
+  }, [token, currentSession]);
 
   const deleteSession = useCallback(async (sessionId: string) => {
     if (!token) return false;

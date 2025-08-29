@@ -202,32 +202,33 @@ export default function MeusAgendamentosModal({
   return (
     <>
       <div
-        className="fixed inset-0 flex items-center justify-center z-50"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         onClick={handleBackdropClick}
       >
-        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden mx-4 sm:mx-0">
+        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl transform transition-all duration-300 scale-100">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 sm:p-6">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-8 py-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <CalendarIcon size={20} weight="fill" className="sm:w-6 sm:h-6" />
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <CalendarIcon size={20} weight="fill" className="text-blue-600" />
+                  </div>
                   Minhas Consultas
                 </h2>
-                <p className="text-blue-100 text-xs sm:text-sm mt-1">
+                <p className="text-gray-600 mt-2">
                   Acompanhe seus agendamentos e reuniões
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={handleRefresh}
                   disabled={isRefreshing}
-                  className="text-white hover:text-blue-200 transition-colors p-2 disabled:opacity-50"
+                  className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl p-3 transition-all duration-200 disabled:opacity-50"
                   title="Atualizar dados do banco"
                 >
                   {isRefreshing ? (
-                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                   ) : (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -236,45 +237,45 @@ export default function MeusAgendamentosModal({
                 </button>
                 <button
                   onClick={onClose}
-                  className="text-white hover:text-blue-200 transition-colors p-1"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl p-3 transition-all duration-200"
                 >
-                  <XIcon size={20} weight="bold" className="sm:w-6 sm:h-6" />
+                  <XIcon size={20} weight="bold" />
                 </button>
               </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-100px)] sm:max-h-[calc(90vh-120px)]">
+          <div className="overflow-y-auto max-h-[60vh] px-8 py-6">
             {isRefreshing && (
-              <div className="flex items-center justify-center py-4 mb-4">
-                <div className="flex items-center gap-2 text-blue-600">
-                  <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                  <span className="text-sm">Atualizando dados do banco...</span>
+              <div className="flex items-center justify-center py-6 mb-6">
+                <div className="flex items-center gap-3 text-blue-600 bg-blue-50 px-6 py-4 rounded-xl border border-blue-200">
+                  <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <span className="text-sm font-medium">Atualizando dados do banco...</span>
                 </div>
               </div>
             )}
 
             {consultasAgendadas.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <CalendarIcon
-                  size={64}
-                  className="text-gray-400 mx-auto mb-6"
-                  weight="light"
-                />
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3">
-                  Nenhum agendamento encontrado
-                </h3>
-                <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto">
-                  Você ainda não possui consultas agendadas. Agende sua primeira consulta para começar.
-                </p>
+              <div className="text-center py-12">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 max-w-md mx-auto">
+                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <CalendarIcon size={32} className="text-gray-400" weight="light" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                    Nenhum agendamento encontrado
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Você ainda não possui consultas agendadas. Agende sua primeira consulta para começar.
+                  </p>
+                </div>
               </div>
             ) : (
-              <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-6">
                 {/* Info sobre atualização de dados */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs text-gray-600 text-center">
-                    Use 🔄 para atualizar se necessário.
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-sm text-blue-800 text-center font-medium">
+                    💡 Use o botão 🔄 para atualizar os dados se necessário
                   </p>
                 </div>
 
@@ -284,9 +285,9 @@ export default function MeusAgendamentosModal({
                     className="group bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-gray-200 transition-all duration-300 overflow-hidden"
                   >
                     {/* Header simplificado */}
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 p-2 rounded-lg">
+                    <div className="flex items-center justify-between p-6 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                           <CalendarIcon
                             size={20}
                             className="text-blue-600"
@@ -294,16 +295,16 @@ export default function MeusAgendamentosModal({
                           />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">
+                          <h3 className="font-semibold text-gray-900 text-lg">
                             Consulta de Alinhamento
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {formatarData(consulta.createdAt)}
+                            Criado em {formatarData(consulta.createdAt)}
                           </p>
                         </div>
                       </div>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(consulta.status)}`}
+                        className={`px-4 py-2 rounded-full text-sm font-medium border ${getStatusColor(consulta.status)}`}
                       >
                         {getStatusText(consulta.status)}
                       </span>
@@ -312,20 +313,20 @@ export default function MeusAgendamentosModal({
                     {/* Content - Versão simplificada e focada */}
                     <div className="p-6">
                       {/* Data e Horário - Destaque principal */}
-                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-blue-600 p-3 rounded-xl">
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center">
                             <CalendarIcon
-                              size={20}
+                              size={24}
                               className="text-white"
                               weight="fill"
                             />
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900 text-lg">
+                            <p className="font-bold text-gray-900 text-xl">
                               {formatarData(consulta.data)}
                             </p>
-                            <p className="text-blue-700 font-semibold">
+                            <p className="text-blue-700 font-semibold text-lg">
                               às {formatarHorario(consulta.horario)}
                             </p>
                           </div>
@@ -384,69 +385,71 @@ export default function MeusAgendamentosModal({
                         console.log("🔍 === FIM DA ANÁLISE ===");
 
                         return hasValidLink ? (
-                          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-                            <div className="flex items-center gap-2 mb-3">
-                              <VideoCameraIcon
-                                size={18}
-                                className="text-green-600 flex-shrink-0"
-                                weight="fill"
-                              />
-                              <span className="text-sm font-medium text-green-800">
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                                <VideoCameraIcon
+                                  size={18}
+                                  className="text-green-600"
+                                  weight="fill"
+                                />
+                              </div>
+                              <span className="text-base font-semibold text-green-800">
                                 Sala de reunião
                               </span>
                             </div>
                             <button
                               onClick={() => handleEntrarReuniao(consulta.googleMeetLink)}
-                              className="w-full bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-105"
                             >
-                              <ArrowUpRightIcon size={16} weight="fill" />
+                              <ArrowUpRightIcon size={18} weight="fill" />
                               Entrar na reunião
                             </button>
                           </div>
                         ) : hasCalendarEvent && statusIsConfirmed ? (
-                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
-                            <p className="text-sm text-blue-800 text-center">
-                              Reunião agendada! O link será enviado em breve.
+                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">
+                            <p className="text-blue-800 text-center font-medium">
+                              🎉 Reunião agendada! O link será enviado em breve.
                             </p>
-                            <p className="text-xs text-blue-600 text-center mt-1">
+                            <p className="text-sm text-blue-600 text-center mt-2">
                               Clique em 🔄 para atualizar se necessário
                             </p>
                           </div>
                         ) : statusIsConfirmed ? (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
-                            <p className="text-sm text-yellow-800 text-center">
-                              Link da reunião será enviado em breve
+                          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                            <p className="text-yellow-800 text-center font-medium">
+                              ⏳ Link da reunião será enviado em breve
                             </p>
                           </div>
                         ) : null
                       })()}                      {/* Ações simplificadas */}
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {consulta.status === "PENDING" && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button
                               onClick={() => handleReabrirPix(consulta)}
-                              className="bg-blue-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
                             >
-                              <QrCodeIcon size={16} weight="fill" />
+                              <QrCodeIcon size={18} weight="fill" />
                               Pagar agora
                             </button>
                             <button
                               onClick={() => handleVerificarPagamento(consulta)}
-                              className="bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                              className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
                             >
-                              <CheckIcon size={16} weight="fill" />
+                              <CheckIcon size={18} weight="fill" />
                               Já paguei
                             </button>
                           </div>
                         )}
 
                         {consulta.status === "CONFIRMED" && (
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             <button
                               onClick={() => handleAlterarAgendamento(consulta)}
-                              className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
                             >
-                              <PencilSimpleIcon size={16} weight="fill" />
+                              <PencilSimpleIcon size={18} weight="fill" />
                               Reagendar
                             </button>
                           </div>
@@ -454,9 +457,9 @@ export default function MeusAgendamentosModal({
 
                         <button
                           onClick={() => handleCancelarConsulta(consulta.id)}
-                          className="w-full bg-red-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                          className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
-                          <TrashIcon size={16} weight="fill" />
+                          <TrashIcon size={18} weight="fill" />
                           Cancelar
                         </button>
                       </div>
@@ -472,25 +475,28 @@ export default function MeusAgendamentosModal({
       {/* Modal do PIX */}
       {selectedConsulta && (
         <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={(e) =>
             e.target === e.currentTarget && setSelectedConsulta(null)
           }
         >
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 sm:mx-0">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 sm:p-6 rounded-t-xl">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl transform transition-all duration-300 scale-100">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                  <CreditCardIcon size={20} weight="fill" className="sm:w-6 sm:h-6" />
-                  Pagamento PIX
-                </h3>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                    <CreditCardIcon size={20} weight="fill" className="text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Pagamento PIX
+                  </h3>
+                </div>
                 <button
                   onClick={() => setSelectedConsulta(null)}
-                  className="text-white hover:text-green-200 transition-colors p-1"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl p-2 transition-all duration-200"
                 >
                   <svg
-                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    className="w-6 h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -506,20 +512,22 @@ export default function MeusAgendamentosModal({
               </div>
             </div>
 
-            <div className="p-4 sm:p-6">
-              <div className="text-center mb-4">
-                <CreditCardIcon size={40} weight="light" className="mx-auto text-gray-400 sm:w-12 sm:h-12" />
-                <h4 className="font-semibold text-gray-900 mb-1 text-lg sm:text-xl">
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <CreditCardIcon size={32} weight="light" className="text-gray-400" />
+                </div>
+                <h4 className="font-bold text-gray-900 mb-2 text-2xl">
                   R$ {selectedConsulta.valor.toFixed(2)}
                 </h4>
-                <p className="text-sm text-gray-600">
+                <p className="text-gray-600">
                   {selectedConsulta.descricao}
                 </p>
               </div>
 
               {selectedConsulta.qrCodePix ? (
                 <div className="text-center">
-                  <div className="bg-gray-100 p-4 rounded-lg mb-4 flex justify-center">
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-xl mb-6 flex justify-center">
                     <QRCodeSVG
                       value={selectedConsulta.qrCodePix}
                       size={200}
@@ -529,16 +537,16 @@ export default function MeusAgendamentosModal({
                   </div>
 
                   {selectedConsulta.copyPastePix && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
                         Código PIX (Copie e Cole):
                       </label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <input
                           type="text"
                           value={selectedConsulta.copyPastePix}
                           readOnly
-                          className="flex-1 bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                          className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                         <button
                           onClick={() =>
@@ -546,7 +554,7 @@ export default function MeusAgendamentosModal({
                               selectedConsulta.copyPastePix!
                             )
                           }
-                          className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-3 rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
                           <CopyIcon size={16} weight="fill" />
                         </button>
@@ -555,19 +563,18 @@ export default function MeusAgendamentosModal({
                   )}
 
                   {selectedConsulta.pixExpiresAt && (
-                    <div className="text-center text-sm text-gray-600">
-                      <p>
-                        Expira em:{" "}
-                        {new Date(selectedConsulta.pixExpiresAt).toLocaleString(
-                          "pt-BR"
-                        )}
-                      </p>
+                    <div className="text-center text-sm text-gray-600 mb-6">
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                        <p className="font-medium text-yellow-800">
+                          ⏰ Expira em: {new Date(selectedConsulta.pixExpiresAt).toLocaleString("pt-BR")}
+                        </p>
+                      </div>
                     </div>
                   )}
 
                   {/* Botão Confirmar Pagamento */}
                   <button
-                    className="w-full py-2 bg-green-600 text-white rounded-lg font-semibold mt-4 hover:bg-green-700"
+                    className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                     onClick={async () => {
                       try {
                         const res = await fetch("/api/payments/manual-update", {
@@ -594,8 +601,10 @@ export default function MeusAgendamentosModal({
                   </button>
                 </div>
               ) : (
-                <div className="text-center text-gray-600">
-                  <p>QR Code PIX não disponível</p>
+                <div className="text-center py-8">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                    <p className="text-gray-600 font-medium">QR Code PIX não disponível</p>
+                  </div>
                 </div>
               )}
             </div>

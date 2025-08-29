@@ -1,6 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient('https://your-supabase-url.supabase.co', 'public-anon-key');
+import { supabaseAdmin as supabase } from '../lib/supabase';
 
 export interface ChecklistTemplateItem { item_id: string; category: string; text: string; }
 const CURRENT_TEMPLATE_VERSION = 2;
@@ -71,7 +69,7 @@ const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
 export class ChecklistService {
   static async listSessions(userId: string) {
     const { data, error } = await supabase
-      .from('checklistSession')
+      .from('checklist_sessions')
       .select(`
         id,
         user_id,
@@ -91,24 +89,34 @@ export class ChecklistService {
   }
 
   static async getSessionWithItems(userId: string, sessionId: string) {
-    let { data: session, error } = await supabase
-      .from('checklistSession')
-      .select('*, items(*)')
+    // Primeiro buscar a sessão
+    let { data: session, error: sessionError } = await supabase
+      .from('checklist_sessions')
+      .select('*')
       .eq('id', sessionId)
       .eq('user_id', userId)
       .single();
 
-    if (error) throw new Error(error.message);
+    if (sessionError) throw new Error(sessionError.message);
     if (!session) return null;
+
+    // Depois buscar os itens relacionados
+    let { data: items, error: itemsError } = await supabase
+      .from('checklist_items')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (itemsError) throw new Error(itemsError.message);
 
     // Backfill / upgrade se sessão está vazia ou usando template antigo
     const needsUpgrade = session.template_version === undefined || session.template_version < CURRENT_TEMPLATE_VERSION;
-    if (session.items.length === 0 || needsUpgrade) {
+    if ((items || []).length === 0 || needsUpgrade) {
       await supabase
-        .from('checklistItem')
+        .from('checklist_items')
         .insert(
           CHECKLIST_TEMPLATE
-            .filter(i => !session.items.map((item: any) => item.item_id).includes(i.item_id))
+            .filter(i => !(items || []).map((item: any) => item.item_id).includes(i.item_id))
             .map(i => ({
               session_id: session.id,
               item_id: i.item_id,
@@ -118,27 +126,29 @@ export class ChecklistService {
         );
 
       await supabase
-        .from('checklistSession')
+        .from('checklist_sessions')
         .update({
           total_items: CHECKLIST_TEMPLATE.length,
           template_version: CURRENT_TEMPLATE_VERSION,
         })
         .eq('id', session.id);
-      
-      // Recarregar com itens agora presentes
-      const { data: updatedSession } = await supabase
-        .from('checklistSession')
-        .select('*, items(*)')
-        .eq('id', sessionId)
-        .single();
-      session = updatedSession;
+
+      // Recarregar os itens após o upgrade
+      const { data: updatedItems } = await supabase
+        .from('checklist_items')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      return { ...session, items: updatedItems || [] };
     }
-    return session;
+
+    return { ...session, items: items || [] };
   }
 
   static async createSession(userId: string, title?: string) {
     const { data: session, error: sessionError } = await supabase
-      .from('checklistSession')
+      .from('checklist_sessions')
       .insert({
         user_id: userId,
         title: title || 'Checklist "Você está pronto(a) para o cartório?"',
@@ -151,7 +161,7 @@ export class ChecklistService {
     if (sessionError) throw new Error(sessionError.message);
 
     await supabase
-      .from('checklistItem')
+      .from('checklist_items')
       .insert(
         CHECKLIST_TEMPLATE.map(i => ({
           session_id: session.id,
@@ -166,7 +176,7 @@ export class ChecklistService {
 
   static async updateItem(userId: string, sessionId: string, itemId: string, checked: boolean) {
     const { data: item, error: itemError } = await supabase
-      .from('checklistItem')
+      .from('checklist_items')
       .select()
       .eq('session_id', sessionId)
       .eq('item_id', itemId)
@@ -176,24 +186,30 @@ export class ChecklistService {
     if (!item) throw new Error("Item not found");
 
     await supabase
-      .from('checklistItem')
+      .from('checklist_items')
       .update({ checked })
       .eq('id', item.id);
 
     // Recalcular progresso
-    const { data: updatedSession } = await supabase
-      .from('checklistSession')
-      .select('*, items(*)')
+    const { data: allItems } = await supabase
+      .from('checklist_items')
+      .select('checked')
+      .eq('session_id', sessionId);
+
+    const checkedCount = (allItems || []).filter((i: any) => i.checked).length;
+
+    // Buscar a sessão para obter total_items
+    const { data: sessionData } = await supabase
+      .from('checklist_sessions')
+      .select('total_items')
       .eq('id', sessionId)
       .single();
 
-    const checkedCount = updatedSession.items.filter((i: any) => i.checked).length;
-
     await supabase
-      .from('checklistSession')
+      .from('checklist_sessions')
       .update({
         progress: checkedCount,
-        completed_at: checkedCount === updatedSession.total_items ? new Date() : null,
+        completed_at: checkedCount === (sessionData?.total_items || 0) ? new Date() : null,
       })
       .eq('id', sessionId);
 
@@ -202,7 +218,7 @@ export class ChecklistService {
 
   static async deleteSession(userId: string, sessionId: string) {
     const { error: sessionError } = await supabase
-      .from('checklistSession')
+      .from('checklist_sessions')
       .delete()
       .eq('id', sessionId)
       .eq('user_id', userId);
@@ -216,16 +232,22 @@ export class ChecklistService {
 // Função utilitária opcional para backfill manual (pode ser chamada em um script ou rota admin futura)
 export async function backfillAllChecklistSessionsForUser(userId: string) {
   const { data: sessions, error } = await supabase
-    .from('checklistSession')
-    .select('*, items(*)')
+    .from('checklist_sessions')
+    .select('*')
     .eq('user_id', userId);
 
   if (error) throw new Error(error.message);
 
   for (const s of sessions) {
-    if (s.items.length === 0) {
+    // Verificar se a sessão tem itens
+    const { data: items } = await supabase
+      .from('checklist_items')
+      .select('id')
+      .eq('session_id', s.id);
+
+    if ((items || []).length === 0) {
       await supabase
-        .from('checklistItem')
+        .from('checklist_items')
         .insert(
           CHECKLIST_TEMPLATE.map(i => ({
             session_id: s.id,
@@ -236,7 +258,7 @@ export async function backfillAllChecklistSessionsForUser(userId: string) {
         );
 
       await supabase
-        .from('checklistSession')
+        .from('checklist_sessions')
         .update({
           total_items: CHECKLIST_TEMPLATE.length,
         })

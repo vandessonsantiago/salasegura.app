@@ -228,6 +228,7 @@ export class UserService {
           name: data.name,
           avatar_url: data.avatar_url,
           phone: data.phone,
+          updated_at: new Date().toISOString(),
         })
         .select('*')
         .single();
@@ -235,8 +236,9 @@ export class UserService {
       if (error) throw error;
 
       return user;
-    } catch (error) {
-      throw new Error(`Failed to upsert user: ${error}`);
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.details || JSON.stringify(error) || 'Unknown error';
+      throw new Error(`Failed to upsert user: ${errorMessage}`);
     }
   }
 }

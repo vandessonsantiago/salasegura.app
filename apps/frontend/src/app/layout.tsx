@@ -2,6 +2,7 @@ import { Instrument_Sans } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ChecklistProvider } from "@/contexts/ChecklistContext";
 import { AgendamentosProvider } from "@/contexts/AgendamentosContext";
+import { DivorceProvider } from "@/contexts/DivorceContext";
 import "./styles.css";
 
 const instrumentSans = Instrument_Sans({
@@ -20,7 +21,9 @@ export default function RootLayout({
         <AuthProvider>
           <ChecklistProvider>
             <AgendamentosProvider>
-              {children}
+              <DivorceProvider>
+                {children}
+              </DivorceProvider>
             </AgendamentosProvider>
           </ChecklistProvider>
         </AuthProvider>

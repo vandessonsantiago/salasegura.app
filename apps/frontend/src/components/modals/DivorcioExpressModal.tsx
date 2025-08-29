@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import CheckoutComponent from '../payments/CheckoutComponent';
+import { useDivorce } from '@/contexts/DivorceContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DivorcioExpressModalProps {
   isOpen: boolean;
@@ -8,6 +10,9 @@ interface DivorcioExpressModalProps {
 
 export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpressModalProps) {
   const [showCheckout, setShowCheckout] = useState(false);
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+  const { createCase, updatePaymentInfo } = useDivorce();
+  const { user } = useAuth();
 
   if (!isOpen) return null;
 
@@ -16,12 +21,24 @@ export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpres
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[95vh] overflow-hidden shadow-2xl transform transition-all duration-300 scale-100">
         {showCheckout ? (
           <CheckoutComponent
-            value={759} // Valor atualizado para R$ 759,00
-            productName="Divórcio Consensual"
+            value={759}
+            productName="Divórcio Express"
             productDescription="Serviço de divórcio consensual simples e 100% guiado."
-            customerId="example-customer-id" // Replace with actual customer ID
-            onSuccess={(paymentId, status, paymentData) => {
+            customerId={user?.id || ''}
+            agendamentoId={currentCaseId || undefined}
+            onSuccess={async (paymentId, status, paymentData) => {
               console.log('Pagamento bem-sucedido:', paymentId, status, paymentData);
+
+              // Atualizar informações de pagamento no caso
+              if (currentCaseId && paymentData) {
+                await updatePaymentInfo(currentCaseId, {
+                  paymentId,
+                  qrCodePix: paymentData.qrCode || '',
+                  copyPastePix: paymentData.copyPaste || '',
+                  pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                });
+              }
+
               setShowCheckout(false);
               onClose();
             }}
@@ -145,7 +162,16 @@ export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpres
                   </button>
                   <button
                     className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-105"
-                    onClick={() => setShowCheckout(true)}
+                    onClick={async () => {
+                      if (!user) return;
+
+                      // Criar caso de divórcio
+                      const newCase = await createCase();
+                      if (newCase) {
+                        setCurrentCaseId(newCase.id);
+                        setShowCheckout(true);
+                      }
+                    }}
                   >
                     Contratar agora
                   </button>

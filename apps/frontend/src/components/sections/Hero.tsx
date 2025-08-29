@@ -5,12 +5,14 @@ import CardHero from './CardHero';
 import dynamic from 'next/dynamic';
 import { useChecklist } from '@/contexts/ChecklistContext';
 import { useAgendamentos } from '@/contexts/AgendamentosContext';
+import { useDivorce } from '@/contexts/DivorceContext';
 import DivorcioExpressModal from '@/components/modals/DivorcioExpressModal';
 
 // Carregar modais dinamicamente (evita SSR issues com window)
 const ChecklistModal = dynamic(() => import('@/components/modals/ChecklistModal'), { ssr: false });
 const AgendamentoModal = dynamic(() => import('@/components/modals/AgendamentoModal'), { ssr: false });
 const MeusAgendamentosModal = dynamic(() => import('@/components/modals/MeusAgendamentosModal'), { ssr: false });
+const MeuDivorcioModal = dynamic(() => import('@/components/modals/MeuDivorcioModal'), { ssr: false });
 
 export default function Hero() {
   const router = useRouter();
@@ -18,8 +20,10 @@ export default function Hero() {
   const [showAgendamento, setShowAgendamento] = useState(false);
   const [showMeusAgendamentos, setShowMeusAgendamentos] = useState(false);
   const [showDivorcioExpressModal, setShowDivorcioExpressModal] = useState(false);
+  const [showMeuDivorcioModal, setShowMeuDivorcioModal] = useState(false);
   const { sessions, currentSession } = useChecklist();
   const { hasConsultas, getLatestConsulta, formatStatus, formatDate, loading } = useAgendamentos();
+  const { hasActiveCase, currentCase, formatStatus: formatDivorceStatus, loading: divorceLoading } = useDivorce();
 
   const handleLogin = () => {
     router.push('/login');
@@ -65,21 +69,55 @@ export default function Hero() {
               }}
             />
 
-            {/* Card 2 - Divórcio Express */}
-            <CardHero
-              icon={<Users size={22} />}
-              title="Divórcio Express - Simples e 100% guiado"
-              price={{
-                original: "R$ 1.450,00",
-                current: "R$ 759,00"
-              }}
-              button={{
-                text: "RESOLVER AGORA",
-                variant: "primary",
-                onClick: () => setShowDivorcioExpressModal(true)
-              }}
-              highlight={true}
-            />
+            {/* Card 2 - Divórcio Express ou Meu Divórcio */}
+            {!divorceLoading && !hasActiveCase ? (
+              <CardHero
+                icon={<Users size={22} />}
+                title="Divórcio Express - Simples e 100% guiado"
+                price={{
+                  original: "R$ 1.450,00",
+                  current: "R$ 759,00"
+                }}
+                button={{
+                  text: "RESOLVER AGORA",
+                  variant: "primary",
+                  onClick: () => setShowDivorcioExpressModal(true)
+                }}
+                highlight={true}
+              />
+            ) : !divorceLoading && hasActiveCase && currentCase ? (
+              <CardHero
+                icon={<Users size={22} />}
+                title="Meu Divórcio Express"
+                status={formatDivorceStatus(currentCase.status)}
+                button={{
+                  text: "VER MEU DIVÓRCIO",
+                  variant: currentCase.status === 'payment_confirmed' ? "primary" : "secondary",
+                  onClick: () => setShowMeuDivorcioModal(true)
+                }}
+                customContent={
+                  currentCase.status === 'pending_payment' ? (
+                    <div className="mt-3 text-xs text-gray-600">
+                      <p className="text-orange-600 font-medium">⏳ Aguardando confirmação do pagamento</p>
+                    </div>
+                  ) : currentCase.status === 'payment_confirmed' ? (
+                    <div className="mt-3 text-xs text-gray-600">
+                      <p className="text-green-600 font-medium">✅ Pagamento confirmado - Processo iniciado</p>
+                    </div>
+                  ) : null
+                }
+              />
+            ) : divorceLoading ? (
+              <CardHero
+                icon={<Users size={22} />}
+                title="Carregando divórcio..."
+                button={{
+                  text: "CARREGANDO...",
+                  variant: "secondary",
+                  onClick: () => {}
+                }}
+              />
+            ) : null}
 
             {/* Card 3 - Consulta (só aparece se NÃO tiver agendamentos E não estiver carregando) */}
             {!loading && !hasConsultas && (
@@ -175,6 +213,12 @@ export default function Hero() {
         isOpen={showDivorcioExpressModal}
         onClose={() => setShowDivorcioExpressModal(false)}
       />
+      {showMeuDivorcioModal && (
+        <MeuDivorcioModal
+          isOpen={showMeuDivorcioModal}
+          onClose={() => setShowMeuDivorcioModal(false)}
+        />
+      )}
     </section>
   );
 }

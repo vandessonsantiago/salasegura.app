@@ -39,7 +39,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Só processar eventos relevantes de pagamento
-    const relevantEvents = ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_PENDING'];
+    const relevantEvents = ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_PENDING', 'PAYMENT_CREATED'];
     if (!relevantEvents.includes(event)) {
       console.log(`ℹ️ Evento não relevante ignorado: ${event}`);
       return res.status(200).json({

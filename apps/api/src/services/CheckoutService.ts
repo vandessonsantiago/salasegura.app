@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { supabaseAdmin as supabase } from '../lib/supabase';
 import { AgendamentoService, AgendamentoData } from './AgendamentoService';
 import { DivorceService } from './DivorceService';
@@ -179,7 +180,8 @@ export class CheckoutService {
         checkoutData.cliente,
         checkoutData.valor,
         checkoutData.descricao,
-        agendamentoResult.agendamento.id!
+        agendamentoResult.agendamento.id!,
+        checkoutData.userId || req.user?.id
       );
 
       if (!paymentResult.success) {
@@ -246,7 +248,8 @@ export class CheckoutService {
     cliente: ClienteData,
     valor: number,
     descricao: string,
-    referenceId: string
+    referenceId: string,
+    userId?: string
   ): Promise<{
     success: boolean;
     paymentId?: string;
@@ -331,6 +334,34 @@ export class CheckoutService {
 
       const pixData = pixResponse.data;
       console.log("✅ [PAGAMENTO] Dados PIX obtidos");
+
+      // Inserir dados do pagamento na tabela payments do Supabase
+      try {
+        const { supabaseAdmin } = require('../lib/supabase');
+        const paymentRecordId = randomUUID();
+
+        const { error: insertError } = await supabaseAdmin
+          .from('payments')
+          .insert({
+            id: paymentRecordId,
+            asaas_id: paymentId,
+            status: 'PENDING',
+            valor: valor,
+            user_id: userId || 'feaa14ea-17d9-4772-947b-ca4d59be2158', // Usar userId passado ou valor padrão
+            agendamento_id: referenceId,
+            created_at: new Date().toISOString(),
+          });
+
+        if (insertError) {
+          console.error('❌ [PAGAMENTO] Erro ao inserir dados na tabela payments:', insertError);
+          // Não falhar o checkout por causa disso, apenas logar
+        } else {
+          console.log('✅ [PAGAMENTO] Dados inseridos na tabela payments:', paymentRecordId);
+        }
+      } catch (dbError) {
+        console.error('❌ [PAGAMENTO] Erro ao salvar dados do pagamento no banco:', dbError);
+        // Não falhar o checkout por causa disso
+      }
 
       return {
         success: true,

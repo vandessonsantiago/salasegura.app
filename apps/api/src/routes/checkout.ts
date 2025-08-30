@@ -22,7 +22,7 @@ const checkoutRequestSchema = z.object({
     name: z.string().min(2),
     email: z.string().email(),
     cpfCnpj: z.string().min(11).max(18),
-    phone: z.string().optional(),
+    phone: z.string().min(10), // 🔧 CORREÇÃO: Tornar phone obrigatório com mínimo de 10 caracteres
   }),
   value: z.number().min(5),
   description: z.string().min(1),

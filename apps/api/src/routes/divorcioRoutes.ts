@@ -8,7 +8,9 @@ const router: Router = Router();
 router.post('/iniciar', authenticateToken, DivorcioController.iniciarCaso);
 
 // Endpoint para iniciar o serviço de divórcio com dados de pagamento (requer autenticação)
-router.post('/iniciar-com-pagamento', authenticateToken, DivorcioController.iniciarCasoComPagamento);
+// Rota duplicada - REMOVIDA para evitar criação de casos duplicados
+// O checkout já cria o caso completo com dados do cliente e PIX
+// router.post('/iniciar-com-pagamento', authenticateToken, DivorcioController.iniciarCasoComPagamento);
 
 // Endpoint para consultar o status do caso de divórcio (requer autenticação)
 router.get('/:id/status', authenticateToken, DivorcioController.consultarStatus);

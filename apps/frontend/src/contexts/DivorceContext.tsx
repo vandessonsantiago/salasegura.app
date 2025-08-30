@@ -80,7 +80,7 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
             id: case_.id,
             userId: case_.user_id,
             type: case_.type,
-            status: case_.status,
+            status: case_.status === 'CONFIRMED' ? 'payment_confirmed' : case_.status, // 🔧 CORREÇÃO: Mapear CONFIRMED para payment_confirmed
             paymentId: case_.payment_id,
             valor: parseFloat(case_.valor),
             createdAt: case_.created_at,
@@ -93,6 +93,7 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
 
           setDivorceCases(cases)
           console.log("✅ Casos de divórcio carregados:", cases)
+          console.log("🔍 Debug - hasActiveCase:", hasActiveCase, "currentCase:", currentCase?.status)
         }
       }
     } catch (error) {
@@ -308,12 +309,12 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
 
   // Verificar se há caso ativo
   const hasActiveCase = divorceCases.some(case_ =>
-    ['pending_payment', 'payment_confirmed', 'in_progress'].includes(case_.status)
+    ['pending_payment', 'payment_confirmed', 'in_progress', 'CONFIRMED'].includes(case_.status)
   )
 
   // Obter caso atual (mais recente ativo)
   const currentCase = divorceCases.find(case_ =>
-    ['pending_payment', 'payment_confirmed', 'in_progress'].includes(case_.status)
+    ['pending_payment', 'payment_confirmed', 'in_progress', 'CONFIRMED'].includes(case_.status)
   ) || null
 
   // Carregar dados na inicialização
@@ -324,6 +325,18 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     }
   }, [user, session?.access_token, loadCasesFromBackend])
+
+  // 🔧 CORREÇÃO: Refresh automático a cada 30 segundos quando há casos ativos
+  useEffect(() => {
+    if (hasActiveCase && session?.access_token) {
+      const interval = setInterval(() => {
+        console.log("🔄 Refresh automático dos casos de divórcio...")
+        loadCasesFromBackend()
+      }, 30000) // 30 segundos
+
+      return () => clearInterval(interval)
+    }
+  }, [hasActiveCase, session?.access_token, loadCasesFromBackend])
 
   const value: DivorceContextType = {
     divorceCases,

@@ -24,7 +24,7 @@ export interface ClienteData {
   name: string;
   email: string;
   cpfCnpj: string;
-  phone: string;
+  phone?: string; // 🔧 CORREÇÃO: Tornar phone opcional para compatibilidade
 }
 
 // Interface para dados do checkout
@@ -273,7 +273,7 @@ export class CheckoutService {
             name: cliente.name,
             email: cliente.email,
             cpfCnpj: cliente.cpfCnpj,
-            phone: cliente.phone,
+            phone: cliente.phone || "", // 🔧 CORREÇÃO: Usar string vazia se phone for undefined
           },
           {
             headers: {
@@ -417,7 +417,7 @@ export class CheckoutService {
         {
           nome: checkoutData.cliente.name,
           email: checkoutData.cliente.email,
-          telefone: checkoutData.cliente.phone,
+          telefone: checkoutData.cliente.phone || "", // 🔧 CORREÇÃO: Usar string vazia se phone for undefined
         }
       );
 

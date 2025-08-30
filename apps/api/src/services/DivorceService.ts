@@ -6,7 +6,7 @@ export interface ClienteData {
   name: string;
   email: string;
   cpfCnpj: string;
-  phone: string;
+  phone?: string; // 🔧 CORREÇÃO: Tornar phone opcional para compatibilidade
 }
 
 // Interface para dados do caso de divórcio
@@ -15,7 +15,7 @@ export interface DivorceCaseData {
   user_id: string;
   type: string;
   status: string;
-  payment_id?: string;
+  payment_id?: string; // 🔧 CORREÇÃO: Alterado para string (era UUID)
   valor: number;
   qr_code_pix?: string;
   copy_paste_pix?: string;
@@ -40,6 +40,25 @@ export class DivorceService {
     serviceData?: any
   ): Promise<{ success: boolean; caseId?: string; error?: string }> {
     try {
+      // Verificar se já existe um caso recente para este usuário com os mesmos dados
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+      const { data: existingCase } = await supabase
+        .from('divorce_cases')
+        .select('id, created_at')
+        .eq('user_id', userId)
+        .eq('cliente_email', cliente.email)
+        .eq('valor', valor)
+        .gte('created_at', fiveMinutesAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (existingCase) {
+        console.log('⚠️ [DIVORCE] Caso duplicado detectado, retornando caso existente:', existingCase.id);
+        return { success: true, caseId: existingCase.id };
+      }
+
       const caseId = randomUUID();
 
       console.log('🏗️ [DIVORCE] Criando caso de divórcio:', {
@@ -59,7 +78,7 @@ export class DivorceService {
           valor: valor,
           cliente_nome: cliente.name,
           cliente_email: cliente.email,
-          cliente_telefone: cliente.phone,
+          cliente_telefone: cliente.phone || "", // 🔧 CORREÇÃO: Usar string vazia se phone for undefined
           service_data: serviceData,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

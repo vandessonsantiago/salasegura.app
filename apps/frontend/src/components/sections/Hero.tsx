@@ -23,7 +23,7 @@ export default function Hero() {
   const [showMeuDivorcioModal, setShowMeuDivorcioModal] = useState(false);
   const { sessions, currentSession } = useChecklist();
   const { hasConsultas, getLatestConsulta, formatStatus, formatDate, loading } = useAgendamentos();
-  const { hasActiveCase, currentCase, formatStatus: formatDivorceStatus, loading: divorceLoading } = useDivorce();
+  const { hasActiveCase, currentCase, formatStatus: formatDivorceStatus, loading: divorceLoading, refresh: refreshDivorce } = useDivorce();
 
   const handleLogin = () => {
     router.push('/login');
@@ -96,15 +96,22 @@ export default function Hero() {
                   onClick: () => setShowMeuDivorcioModal(true)
                 }}
                 customContent={
-                  currentCase.status === 'pending_payment' ? (
-                    <div className="mt-3 text-xs text-gray-600">
-                      <p className="text-orange-600 font-medium">⏳ Aguardando confirmação do pagamento</p>
-                    </div>
-                  ) : currentCase.status === 'payment_confirmed' ? (
-                    <div className="mt-3 text-xs text-gray-600">
-                      <p className="text-green-600 font-medium">✅ Pagamento confirmado - Processo iniciado</p>
-                    </div>
-                  ) : null
+                  <div className="mt-3 space-y-2">
+                    {currentCase.status === 'pending_payment' ? (
+                      <p className="text-xs text-orange-600 font-medium">⏳ Aguardando confirmação do pagamento</p>
+                    ) : currentCase.status === 'payment_confirmed' ? (
+                      <p className="text-xs text-green-600 font-medium">✅ Pagamento confirmado - Processo iniciado</p>
+                    ) : null}
+                    <button
+                      onClick={() => {
+                        console.log("🔄 Forçando refresh dos dados de divórcio...");
+                        refreshDivorce();
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      🔄 Atualizar status
+                    </button>
+                  </div>
                 }
               />
             ) : divorceLoading ? (

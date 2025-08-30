@@ -26,19 +26,19 @@ router.get("/dates", async (_req, res) => {
     let datesWithSlots: { [date: string]: string[] } = {};
     
     try {
-      // Tentar buscar do Google Calendar
+      // Buscar datas disponíveis do Google Calendar
       datesWithSlots = await getAvailableDatesWithSlots(today, 15);
     } catch (googleError) {
       const errorMessage = googleError instanceof Error ? googleError.message : 'Erro desconhecido';
-      console.warn("⚠️ Google Calendar não disponível, usando fallback:", errorMessage);
-      
-      // Fallback: gerar datas mockadas para os próximos 7 dias
-      for (let i = 1; i <= 7; i++) {
-        const futureDate = DateTime.now().setZone(tz).plus({ days: i }).toISODate();
-        if (futureDate) {
-          datesWithSlots[futureDate] = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"];
-        }
-      }
+      console.warn("⚠️ Google Calendar não disponível:", errorMessage);
+
+      // Retornar erro informando que não há disponibilidade
+      return res.status(503).json({
+        error: "Serviço indisponível",
+        message: "Não temos dias e horários disponíveis no momento. O sistema de agendamento está temporariamente indisponível.",
+        availableDates: {},
+        details: "Google Calendar não configurado ou indisponível"
+      });
     }
 
     // Para cada data, verificar agendamentos no Supabase e remover slots ocupados
@@ -110,19 +110,21 @@ router.get("/", async (req, res) => {
     let slotsDetailed: any[] = [];
     
     try {
-      // Tentar buscar do Google Calendar com meet links
+      // Buscar slots disponíveis do Google Calendar com meet links
       slotsDetailed = await getAvailableSlotsWithMeetLinks(date);
     } catch (googleError) {
       const errorMessage = googleError instanceof Error ? googleError.message : 'Erro desconhecido';
-      console.warn("⚠️ Google Calendar não disponível para slots, usando fallback:", errorMessage);
-      
-      // Fallback: slots mockados
-      const mockSlots = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"];
-      slotsDetailed = mockSlots.map(time => ({
-        time,
-        meetLink: "https://meet.google.com/mock-meeting-link",
-        available: true
-      }));
+      console.warn("⚠️ Google Calendar não disponível para slots:", errorMessage);
+
+      // Retornar erro informando que não há disponibilidade
+      return res.status(503).json({
+        error: "Serviço indisponível",
+        message: "Não temos horários disponíveis para esta data. O sistema de agendamento está temporariamente indisponível.",
+        date,
+        availableSlots: [],
+        availableSlotsDetailed: [],
+        details: "Google Calendar não configurado ou indisponível"
+      });
     }
 
     // Buscar agendamentos ocupados no Supabase

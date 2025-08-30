@@ -149,23 +149,6 @@ export default function Hero() {
               />
             )}
 
-            {/* Card 3 - Consulta (só aparece se NÃO tiver agendamentos E não estiver carregando) */}
-            {!loading && !hasConsultas && (
-              <CardHero
-                icon={<CalendarIcon size={22} />}
-                title="Agendar Consulta de Alinhamento Inicial"
-                price={{
-                  original: "R$ 759,00",
-                  current: "R$ 99,00"
-                }}
-                button={{
-                  text: "AGENDAR CONSULTA",
-                  variant: "primary",
-                  onClick: () => setShowAgendamento(true)
-                }}
-              />
-            )}
-
             {/* Card 3 - Meus Agendamentos (só aparece se TIVER agendamentos E não estiver carregando) */}
             {!loading && hasConsultas && latestConsulta && (
               <CardHero
@@ -181,6 +164,12 @@ export default function Hero() {
                   <div className="mt-3 text-xs text-gray-600">
                     {latestConsulta && latestConsulta.status === 'CONFIRMED' && latestConsulta.googleMeetLink && (
                       <p className="text-green-600 font-medium">✅ Link da reunião disponível</p>
+                    )}
+                    {latestConsulta && latestConsulta.status === 'PENDING' && (
+                      <div className="space-y-1">
+                        <p className="text-yellow-600 font-medium">⏳ Aguardando pagamento PIX</p>
+                        <p className="text-gray-500">Prazo: 24h • Valor: R$ {latestConsulta.valor.toFixed(2)}</p>
+                      </div>
                     )}
                   </div>
                 }

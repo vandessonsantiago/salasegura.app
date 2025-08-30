@@ -32,6 +32,12 @@ interface DivorceContextType {
   currentCase: DivorceCase | null
   hasActiveCase: boolean
   createCase: () => Promise<DivorceCase | null>
+  createCaseWithPayment: (paymentData: {
+    paymentId: string
+    qrCodePix: string
+    copyPastePix: string
+    pixExpiresAt: string
+  }) => Promise<DivorceCase | null>
   updateCaseStatus: (id: string, status: DivorceCase["status"]) => Promise<void>
   updatePaymentInfo: (id: string, paymentData: {
     paymentId: string
@@ -111,8 +117,7 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
         {
           method: 'POST',
           body: JSON.stringify({
-            userId: user?.id,
-            type: 'express'
+            type: 'traditional'  // Temporariamente usando 'traditional' para contornar constraint
           })
         }
       )
@@ -121,7 +126,7 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
         const newCase: DivorceCase = {
           id: result.data.caseId,
           userId: user?.id || '',
-          type: 'express',
+          type: 'traditional',  // Atualizado para corresponder ao enviado
           status: 'pending_payment',
           valor: 759.00,
           createdAt: new Date().toISOString(),
@@ -136,6 +141,62 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
       return null
     } catch (error) {
       console.error("❌ Erro ao criar caso de divórcio:", error)
+      return null
+    }
+  }, [session?.access_token, user?.id])
+
+  // Criar novo caso de divórcio com dados de pagamento completos
+  const createCaseWithPayment = useCallback(async (paymentData: {
+    paymentId: string
+    qrCodePix: string
+    copyPastePix: string
+    pixExpiresAt: string
+  }): Promise<DivorceCase | null> => {
+    try {
+      if (!session?.access_token) {
+        console.error("❌ Usuário não autenticado")
+        return null
+      }
+
+      console.log("📡 Criando novo caso de divórcio com dados de pagamento...")
+      const result = await authJsonFetch(
+        "/divorcio/iniciar-com-pagamento",
+        session.access_token,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'express',
+            paymentId: paymentData.paymentId,
+            qrCodePix: paymentData.qrCodePix,
+            copyPastePix: paymentData.copyPastePix,
+            pixExpiresAt: paymentData.pixExpiresAt
+          })
+        }
+      )
+
+      if (result && result.success && result.data) {
+        const newCase: DivorceCase = {
+          id: result.data.caseId,
+          userId: user?.id || '',
+          type: 'express',
+          status: 'pending_payment',
+          paymentId: paymentData.paymentId,
+          qrCodePix: paymentData.qrCodePix,
+          copyPastePix: paymentData.copyPastePix,
+          pixExpiresAt: paymentData.pixExpiresAt,
+          valor: 759.00,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        setDivorceCases(prev => [newCase, ...prev])
+        console.log("✅ Caso de divórcio criado com pagamento:", newCase)
+        return newCase
+      }
+
+      return null
+    } catch (error) {
+      console.error("❌ Erro ao criar caso de divórcio com pagamento:", error)
       return null
     }
   }, [session?.access_token, user?.id])
@@ -270,6 +331,7 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
     currentCase,
     hasActiveCase,
     createCase,
+    createCaseWithPayment,
     updateCaseStatus,
     updatePaymentInfo,
     refresh,

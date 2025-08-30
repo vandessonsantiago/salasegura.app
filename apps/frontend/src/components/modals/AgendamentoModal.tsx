@@ -9,6 +9,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext"
 import CheckoutComponent from "../payments/CheckoutComponent"
 import { apiEndpoint } from "../../lib/api"
+import { useAppointmentCheckout } from "@/hooks/useSpecializedCheckout"
 
 // Helper para fazer requests para a API
 const api = {
@@ -86,9 +87,35 @@ export default function AgendamentoModal({
   }>({})
   const [loadingDates, setLoadingDates] = useState(false)
   const [clienteTelefone, setClienteTelefone] = useState<string>("")
+  const [feedbackMessage, setFeedbackMessage] = useState<{
+    type: 'success' | 'error' | 'info'
+    message: string
+  } | null>(null)
 
   const { addConsulta } = useAgendamentos()
   const { user } = useAuth()
+  const appointmentCheckout = useAppointmentCheckout()
+
+  // 🔧 CORREÇÃO: Criar wrapper para o hook que inclui dados do slot selecionado
+  const appointmentCheckoutWithSlotData = {
+    ...appointmentCheckout,
+    generatePix: async (value: number) => {
+      // Incluir dados do slot selecionado no serviceData
+      const serviceData = {
+        calendarEventId: selectedSlotDetail?.calendarEventId || selectedSlotDetail?.eventId,
+        googleMeetLink: selectedSlotDetail?.googleMeetLink || selectedSlotDetail?.meetLink,
+      };
+
+      console.log("🎯 [FRONTEND] Gerando PIX com dados do slot selecionado:", {
+        calendarEventId: serviceData.calendarEventId,
+        googleMeetLink: serviceData.googleMeetLink,
+        selectedDate,
+        selectedTime,
+      });
+
+      return appointmentCheckout.generatePix(value, serviceData, selectedDate, selectedTime);
+    }
+  };
 
   // Buscar datas disponíveis nos próximos 15 dias
   const fetchAvailableDates = useCallback(async () => {
@@ -239,6 +266,16 @@ export default function AgendamentoModal({
     }
   }, [selectedDate, fetchAvailableSlots])
 
+  // Limpar feedback message automaticamente após 5 segundos
+  useEffect(() => {
+    if (feedbackMessage) {
+      const timer = setTimeout(() => {
+        setFeedbackMessage(null)
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [feedbackMessage])
+
   const handleDateSelect = (date: string) => {
     setSelectedDate(date)
     setSelectedTime("")
@@ -246,51 +283,32 @@ export default function AgendamentoModal({
 
   const handleSubmit = async () => {
     if (!selectedDate || !selectedTime) {
-      alert("Por favor, selecione uma data e horário")
+      setFeedbackMessage({
+        type: 'error',
+        message: 'Por favor, selecione uma data e horário'
+      })
       return
     }
 
     if (!clienteTelefone.trim()) {
-      alert("Por favor, informe seu telefone para contato")
+      setFeedbackMessage({
+        type: 'error',
+        message: 'Por favor, informe seu telefone para contato'
+      })
       return
     }
 
     setLoading(true)
     try {
-    // Cria o agendamento no backend e só depois inicia o checkout
-    const consultaTemp = {
-      id: `temp_${Date.now()}`, // ID temporário, será substituído pelo backend
-      data: selectedDate,
-      horario: selectedTime,
-      status: "PENDING" as const,
-      paymentId: "",
-      paymentStatus: "PENDING" as const,
-      valor: 99.0,
-      descricao: `Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`,
-      cliente: {
-        nome: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
-        email: user?.email || "",
-        telefone: clienteTelefone || "(92) 99999-9999", // Fallback caso não seja informado
-      },
-      createdAt: new Date().toISOString(),
-      qrCodePix: undefined,
-      copyPastePix: undefined,
-      pixExpiresAt: undefined,
-      calendarEventId: selectedSlotDetail?.calendarEventId || selectedSlotDetail?.eventId,
-      googleMeetLink: selectedSlotDetail?.googleMeetLink || selectedSlotDetail?.meetLink,
-    }      // Salva no backend e obtém o id real
-      const novaConsulta = await addConsulta(consultaTemp)
-      if (!novaConsulta || !novaConsulta.id) {
-        alert("Erro ao criar agendamento. Tente novamente.")
-        return
-      }
-
-      // Armazenar o ID do agendamento e mostrar o checkout
-      setCurrentAgendamentoId(novaConsulta.id)
+      // NÃO criar agendamento ainda - primeiro gerar o PIX
+      // O agendamento será criado APÓS o processamento do pagamento
       setShowCheckout(true)
     } catch (error) {
-      console.error("Erro ao criar agendamento:", error)
-      alert("Erro ao criar agendamento. Tente novamente.")
+      console.error("Erro ao iniciar checkout:", error)
+      setFeedbackMessage({
+        type: 'error',
+        message: 'Erro ao iniciar checkout. Tente novamente.'
+      })
     } finally {
       setLoading(false)
     }
@@ -305,34 +323,80 @@ export default function AgendamentoModal({
     status: string,
     pixData?: { qrCode?: string; copyPaste?: string }
   ) => {
-    console.log("Pagamento realizado:", { paymentId, status, pixData })
+    console.log("Pagamento processado:", { paymentId, status, pixData })
 
-    // Atualizar o agendamento existente com os dados do pagamento
-    if (currentAgendamentoId) {
-      // Aqui podemos atualizar o agendamento com dados do PIX se necessário
-      console.log("💰 Pagamento confirmado para agendamento:", currentAgendamentoId)
+    try {
+      if (status === 'PENDING') {
+        // PIX foi gerado, mas pagamento ainda não foi confirmado
+        // Apenas armazenar os dados para uso posterior
+        console.log("PIX gerado com sucesso, aguardando confirmação do pagamento")
+        return
+      }
+
+      if (status === 'CONFIRMED') {
+        // Pagamento foi confirmado - AGORA criar o agendamento
+        const consultaComPix = {
+          id: `temp_${Date.now()}`, // ID temporário, será substituído pelo backend
+          data: selectedDate,
+          horario: selectedTime,
+          status: 'CONFIRMED' as const,
+          paymentId: paymentId,
+          paymentStatus: 'CONFIRMED' as const,
+          valor: 99.0,
+          descricao: `Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`,
+          cliente: {
+            nome: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
+            email: user?.email || "",
+            telefone: clienteTelefone || "(92) 99999-9999",
+          },
+          createdAt: new Date().toISOString(),
+          qrCodePix: pixData?.qrCode || '',
+          copyPastePix: pixData?.copyPaste || '',
+          pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
+          calendarEventId: selectedSlotDetail?.calendarEventId || selectedSlotDetail?.eventId,
+          googleMeetLink: selectedSlotDetail?.googleMeetLink || selectedSlotDetail?.meetLink,
+        }
+
+        // Salva no backend com dados completos do PIX
+        const novaConsulta = await addConsulta(consultaComPix)
+        if (!novaConsulta || !novaConsulta.id) {
+          setFeedbackMessage({
+            type: 'error',
+            message: 'Erro ao criar agendamento. Tente novamente.'
+          })
+          return
+        }
+
+        // Armazenar o ID do agendamento criado
+        setCurrentAgendamentoId(novaConsulta.id)
+
+        console.log("✅ Agendamento criado com sucesso com dados PIX:", novaConsulta.id)
+        setFeedbackMessage({
+          type: 'success',
+          message: 'Pagamento confirmado! Seu agendamento foi criado com sucesso.'
+        })
+      }
+
+    } catch (error) {
+      console.error("Erro ao processar agendamento:", error)
+      setFeedbackMessage({
+        type: 'error',
+        message: 'Erro ao processar agendamento. Tente novamente.'
+      })
     }
-
-    // NÃO fechar o modal aqui - deixar o CheckoutComponent gerenciar
-    // O checkout vai mostrar countdown de 15s e depois fechar automaticamente
-    // setShowCheckout(false)
-    // setCurrentAgendamentoId(null)
   }
 
   const handleCheckoutError = (error: string) => {
     console.error("Erro no checkout:", error)
-    alert(`Erro no pagamento: ${error}`)
+    setFeedbackMessage({
+      type: 'error',
+      message: `Erro no pagamento: ${error}`
+    })
   }
 
   const handleCheckoutCancel = () => {
     setShowCheckout(false)
     onClose() // FECHA TUDO e volta ao dashboard
-  }
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
   }
 
   // Buscar slots quando data for selecionada
@@ -365,18 +429,14 @@ export default function AgendamentoModal({
   if (showCheckout) {
     console.log("🎯 Renderizando checkout")
     return (
-      <div
-        className="fixed inset-0 flex items-center justify-center z-50"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-        onClick={handleBackdropClick}
-      >
-        <div className="max-w-4xl w-full max-h-[95vh] overflow-y-auto flex items-start justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="max-w-4xl w-full max-h-[95vh] overflow-y-auto flex items-start justify-center">
           <CheckoutComponent
             value={99.0}
             productName="Consulta de Alinhamento Inicial"
             productDescription={`Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`}
             customerId={undefined}
-            agendamentoId={currentAgendamentoId || undefined}
+            checkoutHook={appointmentCheckoutWithSlotData}
             onSuccess={handleCheckoutSuccess}
             onError={handleCheckoutError}
             onCancel={handleCheckoutCancel}
@@ -390,43 +450,99 @@ export default function AgendamentoModal({
 
   return (
     <>
-      <div
-        className="fixed inset-0 flex items-center justify-center z-50"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-        onClick={handleBackdropClick}
-      >
-        <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[95vh] overflow-hidden shadow-2xl transform transition-all duration-300 scale-100">
           {/* Header */}
-          <div className="bg-blue-600 text-white px-6 py-4 rounded-t-xl">
-            <div>
-              <h2 className="text-xl font-semibold leading-tight flex items-center gap-2">
-                <CalendarIcon size={24} weight="fill" />
-                Agendar Alinhamento Inicial
-              </h2>
-              <p className="text-blue-100 text-sm mt-1 leading-relaxed">
-                Consulta de 45 minutos - Custo acessível
-              </p>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-8 py-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <CalendarIcon size={20} weight="fill" className="text-blue-600" />
+                  </div>
+                  Agendar Alinhamento Inicial
+                </h2>
+                <p className="text-gray-600 mt-2">
+                  Consulta de 45 minutos - Custo acessível
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl p-3 transition-all duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
 
+          {/* Feedback Message */}
+          {feedbackMessage && (
+            <div className={`mx-8 mt-4 p-4 rounded-xl border-l-4 flex items-center gap-3 ${
+              feedbackMessage.type === 'success'
+                ? 'bg-green-50 border-green-500 text-green-800'
+                : feedbackMessage.type === 'error'
+                ? 'bg-red-50 border-red-500 text-red-800'
+                : 'bg-blue-50 border-blue-500 text-blue-800'
+            }`}>
+              <div className={`flex-shrink-0 w-5 h-5 ${
+                feedbackMessage.type === 'success'
+                  ? 'text-green-600'
+                  : feedbackMessage.type === 'error'
+                  ? 'text-red-600'
+                  : 'text-blue-600'
+              }`}>
+                {feedbackMessage.type === 'success' ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : feedbackMessage.type === 'error' ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <p className="text-sm font-medium">{feedbackMessage.message}</p>
+              <button
+                onClick={() => setFeedbackMessage(null)}
+                className={`ml-auto flex-shrink-0 w-4 h-4 rounded-full hover:bg-black/10 transition-colors ${
+                  feedbackMessage.type === 'success'
+                    ? 'text-green-600'
+                    : feedbackMessage.type === 'error'
+                    ? 'text-red-600'
+                    : 'text-blue-600'
+                }`}
+              >
+                <svg fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="overflow-y-auto max-h-[60vh] px-8 py-6">
             {/* Seleção de Data */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <CalendarIcon size={20} weight="fill" />
+            <div className="mb-8">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <CalendarIcon size={20} weight="fill" className="text-blue-600" />
                 Escolha uma data:
               </h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {getAvailableDates().map((date) => (
                   <button
                     key={date.date}
                     data-date={date.date}
                     onClick={() => setSelectedDate(date.date || "")}
-                    className={`p-3 text-sm rounded-lg border transition-colors ${
+                    className={`p-4 text-sm rounded-xl border transition-all duration-200 ${
                       selectedDate === date.date
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                        ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-blue-500 shadow-lg"
+                        : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                     }`}
                   >
                     {date.label}
@@ -437,19 +553,23 @@ export default function AgendamentoModal({
             </div>
 
             {/* Seleção de Horário */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                ⏰ Escolha um horário:
+            <div className="mb-8">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12,6 12,12 16,14"></polyline>
+                </svg>
+                Escolha um horário:
               </h3>
               {loadingSlots ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <div className="text-center py-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
                   <p className="text-sm text-gray-600">
                     Carregando horários disponíveis...
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {getTimeSlots().map((slot) => (
                     <button
                       key={slot.id}
@@ -465,17 +585,17 @@ export default function AgendamentoModal({
                         setSelectedSlotDetail(detail)
                       }}
                       disabled={!slot.available}
-                      className={`p-3 text-sm rounded-lg border transition-colors ${
+                      className={`p-4 text-sm rounded-xl border transition-all duration-200 ${
                         !slot.available
                           ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                           : selectedTime === slot.time
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-blue-500 shadow-lg"
+                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                       }`}
                     >
                       {slot.label}
                       {!slot.available && (
-                        <span className="block text-xs">Ocupado</span>
+                        <span className="block text-xs mt-1">Ocupado</span>
                       )}
                     </button>
                   ))}
@@ -484,23 +604,26 @@ export default function AgendamentoModal({
             </div>
 
             {/* Informações de Contato */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                📞 Informações de contato:
+            <div className="mb-8">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                Informações de contato:
               </h3>
-              <div className="space-y-3">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome: <span className="text-blue-600">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente"}</span>
+                    Nome: <span className="text-blue-600 font-semibold">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente"}</span>
                   </label>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email: <span className="text-blue-600">{user?.email}</span>
+                    Email: <span className="text-blue-600 font-semibold">{user?.email}</span>
                   </label>
                 </div>
                 <div>
-                  <label htmlFor="telefone" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="telefone" className="block text-sm font-medium text-gray-700 mb-2">
                     Telefone: <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -509,7 +632,7 @@ export default function AgendamentoModal({
                     value={clienteTelefone}
                     onChange={(e) => setClienteTelefone(e.target.value)}
                     placeholder="(92) 99999-9999"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     required
                   />
                 </div>
@@ -517,14 +640,14 @@ export default function AgendamentoModal({
             </div>
 
             {/* Informações */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8">
               <div className="flex items-center gap-3">
                 <div className="flex-shrink-0 text-blue-600 text-lg">ℹ️</div>
                 <div className="text-sm text-blue-800">
-                  <p className="font-semibold mb-2">
+                  <p className="font-semibold mb-3">
                     Sobre o Alinhamento Inicial:
                   </p>
-                  <ul className="space-y-1 text-xs leading-relaxed">
+                  <ul className="space-y-2 text-xs leading-relaxed">
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 mt-0.5">•</span>
                       <span>Duração: 45 minutos</span>
@@ -545,23 +668,33 @@ export default function AgendamentoModal({
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Botões de ação */}
-            <div className="space-y-3">
-              <button
-                onClick={handleSubmit}
-                disabled={!selectedDate || !selectedTime || loading}
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700"
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Agendando...
-                  </div>
-                ) : (
-                  "CONFIRMAR AGENDAMENTO"
-                )}
-              </button>
+          {/* Footer */}
+          <div className="bg-gradient-to-r from-gray-50 to-slate-50 px-8 py-6 border-t border-gray-200">
+            <div className="max-w-md mx-auto">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!selectedDate || !selectedTime || loading}
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Agendando...
+                    </div>
+                  ) : (
+                    "CONFIRMAR AGENDAMENTO"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

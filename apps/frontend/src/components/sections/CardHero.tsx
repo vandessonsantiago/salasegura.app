@@ -15,6 +15,9 @@ interface CardHeroProps {
   status?: {
     text: string;
     variant: 'pending' | 'confirmed' | 'cancelled' | 'expired';
+    description?: string;
+    icon?: string;
+    color?: string;
   };
   progress?: {
     current: number;
@@ -83,19 +86,27 @@ export default function CardHero({
               </span>
             </div>
           ) : status ? (
-            <span className={`
-              px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide
-              ${status.variant === 'pending' 
-                ? 'bg-yellow-100 text-yellow-700' 
-                : status.variant === 'confirmed'
-                ? 'bg-green-100 text-green-700'
-                : status.variant === 'cancelled'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-gray-100 text-gray-700'
-              }
-            `}>
-              {status.text}
-            </span>
+            <div className="flex flex-col gap-1">
+              <span className={`
+                px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide inline-flex items-center gap-1
+                ${status.variant === 'pending' 
+                  ? 'bg-yellow-100 text-yellow-700' 
+                  : status.variant === 'confirmed'
+                  ? 'bg-green-100 text-green-700'
+                  : status.variant === 'cancelled'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-gray-100 text-gray-700'
+                }
+              `}>
+                {status.icon && <span className="text-xs">{status.icon}</span>}
+                {status.text}
+              </span>
+              {status.description && (
+                <span className="text-xs text-gray-500 max-w-[120px] truncate">
+                  {status.description}
+                </span>
+              )}
+            </div>
           ) : badge ? (
             <span className={`
               px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide

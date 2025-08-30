@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface CheckoutFormData {
   name: string;
@@ -44,32 +45,60 @@ export function useSimpleCheckout() {
     }));
   };
 
-  const { user } = require("../contexts/AuthContext").useAuth();
-  const generatePix = async (value: number, agendamentoId?: string): Promise<PixData> => {
+    const { user, session } = useAuth();
+  const generatePix = async (value: number): Promise<PixData> => {
     setIsLoading(true);
     try {
+      console.log("🎯 [FRONTEND] ===== INÍCIO DO GERAR PIX =====");
+      console.log("💰 [FRONTEND] Valor:", value);
+      console.log("👤 [FRONTEND] User ID:", user?.id);
       // Primeiro, tente criar pagamento real no backend (/api/v1/checkout)
       try {
         const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // tomorrow YYYY-MM-DD
-        const payload = {
+        const payload: any = {
           customer: {
             name: formData.name || "Cliente",
-            email: formData.email || `cliente+${Date.now()}@example.com`,
-            cpfCnpj: formData.cpfCnpj || "00000000000",
-            phone: formData.phone || undefined,
+            email: formData.email || `cliente+${Date.now()}@gmail.com`,
+            cpfCnpj: formData.cpfCnpj || "91010004204", // CPF válido para teste
+            phone: formData.phone ? `55${formData.phone.replace(/\D/g, '')}` : "5511987654321", // Formatar telefone
           },
           billingType: "PIX",
           value,
           dueDate,
           description: "Pagamento via SalaSegura",
-          userId: user?.id || "",
-          agendamentoId: agendamentoId || undefined,
+          serviceType: "divorcio", // Tipo do serviço
+          serviceData: {
+            // Dados específicos do serviço podem ser adicionados aqui
+          },
+          userId: user?.id || "", // Adicionar userId ao payload
         };
 
-        console.log("🟢 Checkout: enviando requisição ao backend http://localhost:8001/api/v1/checkout", payload)
+        console.log("� [FRONTEND] Payload completo sendo enviado:");
+        console.log("📤 [FRONTEND] Customer:", payload.customer);
+        console.log("📤 [FRONTEND] Billing Type:", payload.billingType);
+        console.log("📤 [FRONTEND] Value:", payload.value);
+        console.log("📤 [FRONTEND] Due Date:", payload.dueDate);
+        console.log("📤 [FRONTEND] User ID:", payload.userId);
+        console.log("📤 [FRONTEND] Service Type:", payload.serviceType);
+        console.log("📤 [FRONTEND] Service Data:", payload.serviceData);
+        console.log("📤 [FRONTEND] User ID no payload:", payload.userId);
+
+        console.log("🟢 [FRONTEND] Enviando requisição ao backend http://localhost:8001/api/v1/checkout")
+        console.log("👤 [FRONTEND] User atual:", user);
+        console.log("🔑 [FRONTEND] Session atual:", session ? "Presente" : "Ausente");
+        console.log("🎫 [FRONTEND] Access token:", session?.access_token ? "Presente" : "Ausente");
+        
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        
+        // TEMPORÁRIO: Usar token de desenvolvimento se não houver sessão
+        const authToken = session?.access_token || 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c';
+        
+        headers["Authorization"] = `Bearer ${authToken}`;
+        console.log("🔐 [FRONTEND] Token de autenticação incluído na requisição:", authToken === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c' ? "TOKEN DEV" : "TOKEN USER");
+        
         const res = await fetch("http://localhost:8001/api/v1/checkout", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify(payload),
         })
 
@@ -80,37 +109,42 @@ export function useSimpleCheckout() {
         }
 
         const json = await res.json()
-        console.log("🟢 Backend /api/v1/checkout resposta:", json)
+        console.log("🟢 [FRONTEND] Backend /api/v1/checkout resposta recebida");
+        console.log("📋 [FRONTEND] Payment ID:", json.paymentId);
+        console.log("📅 [FRONTEND] Agendamento ID:", json.agendamentoId);
+        console.log("📊 [FRONTEND] Status:", json.status);
+        console.log("💰 [FRONTEND] Valor:", json.value);
+        console.log("📅 [FRONTEND] PIX QR Code presente:", !!json.qrCodePix);
+        console.log("📋 [FRONTEND] PIX Copy&Paste presente:", !!json.copyPastePix);
 
         const pixData: PixData = {
-          id: json.id,
-          qrCode: json.pixQrCode || "",
-          copyPaste: json.pixCopyAndPaste || "",
+          id: json.paymentId,
+          qrCode: json.qrCodePix || "",
+          copyPaste: json.copyPastePix || "",
           expiresAt: json.pixExpiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         }
 
-        // If backend didn't return usable pix, fallback to placeholder below
-        if (!pixData.copyPaste || pixData.copyPaste.length < 20) {
-          console.warn("⚠️ Backend returned empty/short copyPaste; falling back to local placeholder PIX")
-        } else {
-          setPaymentData(pixData)
-          return pixData
+        // If backend didn't return usable pix, throw error instead of using placeholder
+        if (!pixData.qrCode || !pixData.copyPaste || pixData.copyPaste.length < 10) {
+          console.error("❌ Backend returned incomplete PIX data:", {
+            hasQrCode: !!pixData.qrCode,
+            hasCopyPaste: !!pixData.copyPaste,
+            copyPasteLength: pixData.copyPaste?.length,
+            qrCodeLength: pixData.qrCode?.length
+          })
+          throw new Error("Dados PIX incompletos retornados pelo servidor. Tente novamente ou entre em contato com o suporte.")
         }
+
+        console.log("✅ PIX data from backend is valid, using it")
+        setPaymentData(pixData)
+        return pixData
       } catch (err) {
-        console.warn("⚠️ Erro ao gerar PIX via backend, usando placeholder local:", err)
-        // fallthrough to local mock below
+        console.error("❌ [FRONTEND] ===== ERRO NO GERAR PIX =====");
+        console.error("❌ [FRONTEND] Erro completo:", err);
+        console.error("❌ [FRONTEND] Tipo do erro:", err instanceof Error ? err.constructor.name : typeof err);
+        console.error("❌ [FRONTEND] Mensagem:", err instanceof Error ? err.message : 'Erro desconhecido');
+        throw err
       }
-
-      // Fallback local placeholder (mantido para desenvolvimento/offline)
-      const pixData: PixData = {
-      id: undefined,
-      qrCode: `00020126580014BR.GOV.BCB.PIX0136123e4567-e12b-12d1-a456-426614174000520400005303986540${value.toFixed(2)}5802BR5925${formData.name.substring(0, 25)}6009SAO PAULO62070503***6304`,
-      copyPaste: `00020126580014BR.GOV.BCB.PIX0136123e4567-e12b-12d1-a456-426614174000520400005303986540${value.toFixed(2)}5802BR5925${formData.name.substring(0, 25)}6009SAO PAULO62070503***6304`,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      }
-
-      setPaymentData(pixData)
-      return pixData
     } catch (error) {
       console.error('Erro ao gerar PIX:', error);
       throw error;

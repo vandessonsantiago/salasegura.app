@@ -4,8 +4,8 @@ import { DateTime, Interval } from "luxon"
 const calendar = google.calendar("v3")
 
 function getAuthClient() {
-  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
-  const privateKeyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+  const clientEmail = process.env.GOOGLE_CLIENT_MAIL
+  const privateKeyRaw = process.env.GOOGLE_PRIVATE_KEY
 
   if (!clientEmail || !privateKeyRaw) {
     throw new Error("Missing Google service account credentials")
@@ -327,16 +327,7 @@ export async function getAvailableDatesWithSlots(
     })
   } catch (err) {
     console.error("❌ Falha ao consultar Google Calendar events.list:", err)
-    console.warn("⚠️ Usando fallback local de 7 dias por causa do erro no Google Calendar")
-    // fallback local: populate next 7 days with common slots
-    const dateSlots: { [date: string]: string[] } = {}
-    for (let i = 1; i <= 7; i++) {
-      const dt = DateTime.now().setZone(tz).plus({ days: i }).toISODate()
-      if (dt) {
-        dateSlots[dt] = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"]
-      }
-    }
-    return dateSlots
+    throw new Error("Google Calendar não está disponível. Não é possível obter datas disponíveis.")
   }
 
   console.log(
@@ -382,13 +373,7 @@ export async function getAvailableDatesWithSlots(
   // to display (prevents blank UI when Google Calendar is reachable but has
   // no 'Consulta - Alinhamento Inicial' events).
   if (Object.keys(dateSlots).length === 0) {
-    console.warn("⚠️ Nenhum evento de slot encontrado no Google Calendar — usando fallback local de 7 dias")
-    for (let i = 1; i <= 7; i++) {
-      const dt = DateTime.now().setZone(tz).plus({ days: i }).toISODate()
-      if (dt) {
-        dateSlots[dt] = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"]
-      }
-    }
+    throw new Error("Nenhum slot disponível encontrado no Google Calendar.")
   }
 
   return dateSlots
@@ -429,7 +414,7 @@ export async function createCalendarEvent(params: {
       description: params.description,
       start: { dateTime: startDT.toISO(), timeZone: tz },
       end: { dateTime: endDT.toISO(), timeZone: tz },
-      attendees: (params.attendees || []).map((email) => ({ email })),
+      attendees: [], // Removido attendees para evitar erro de service account
       conferenceData: { createRequest: { requestId: `meet-${Date.now()}` } },
     },
   })
@@ -483,15 +468,57 @@ export async function createCalendarEvent(params: {
   return { eventId, meetLink }
 }
 
-export async function deleteCalendarEvent(eventId: string): Promise<void> {
+export async function updateCalendarEvent(params: {
+  eventId: string
+  summary?: string
+  description?: string
+  attendees?: string[]
+}): Promise<{ eventId: string; meetLink?: string }> {
   const calendarId = process.env.GOOGLE_CALENDAR_ID
   if (!calendarId) throw new Error("Missing GOOGLE_CALENDAR_ID")
+
   const auth = getAuthClient()
   await auth.authorize()
-  await calendar.events.delete({
+
+  // Primeiro, buscar o evento existente para obter os dados atuais
+  const existingEvent = await calendar.events.get({
     auth,
     calendarId,
-    eventId,
-    sendUpdates: "all",
+    eventId: params.eventId,
   })
+
+  // Preparar os dados para atualização
+  const updateData: any = {
+    summary: params.summary || existingEvent.data.summary,
+    description: params.description || existingEvent.data.description,
+  }
+
+  // Se attendees forem fornecidos, adicionar (mas sem Domain-Wide Delegation isso pode falhar)
+  if (params.attendees && params.attendees.length > 0) {
+    updateData.attendees = params.attendees.map(email => ({ email }))
+  }
+
+  const response = await calendar.events.update({
+    auth,
+    calendarId,
+    eventId: params.eventId,
+    requestBody: updateData,
+  })
+
+  const eventId = String(response?.data?.id || "")
+  let meetLink = String(
+    response?.data?.hangoutLink ||
+      response?.data?.conferenceData?.entryPoints?.find(
+        (e) => e.entryPointType === "video"
+      )?.uri ||
+      ""
+  )
+
+  console.log(`🔄 Evento atualizado:`, {
+    eventId,
+    meetLink,
+    summary: params.summary
+  });
+
+  return { eventId, meetLink }
 }

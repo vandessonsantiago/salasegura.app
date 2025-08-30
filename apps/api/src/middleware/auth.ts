@@ -21,8 +21,8 @@ export const authenticateToken = async (
       if (process.env.NODE_ENV === 'development' && token === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c') {
         console.log('[Auth] Development bypass enabled for test token');
         req.user = {
-          id: 'dev-user-id',
-          email: 'dev@example.com',
+          id: 'feaa14ea-17d9-4772-947b-ca4d59be2158', // Novo ID do usuário criado
+          email: 'vandesson.santiago@gmail.com',
           name: 'Dev User',
           created_at: new Date(),
           updated_at: new Date(),

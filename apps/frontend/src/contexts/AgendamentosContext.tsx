@@ -56,6 +56,9 @@ interface AgendamentosContextType {
   formatStatus: (status: ConsultaAgendada["status"]) => {
     text: string
     variant: 'pending' | 'confirmed' | 'cancelled' | 'expired'
+    description: string
+    icon: string
+    color: string
   }
   formatDate: (dateStr: string) => string
 }
@@ -75,18 +78,34 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
   const loadConsultasFromStorage = useCallback(async () => {
     try {
       setLoading(true)
+      console.log("🔄 [LOAD] Iniciando carregamento de agendamentos...")
 
       // Buscar do backend Supabase se usuário está logado
       if (session?.access_token) {
-        console.log("📡 Buscando agendamentos do backend...")
+        console.log("📡 [LOAD] Buscando agendamentos do backend...")
         try {
           const result = await authJsonFetch(
-            "/agendamentos",
+            "/agendamento",
             session.access_token,
             { method: 'GET' }
           )
-          console.log("📥 Resposta do backend:", result)
+          console.log("📥 [LOAD] Resposta bruta do backend:", result)
+
           if (result && result.success && result.data) {
+            console.log(`📊 [LOAD] ${result.data.length} agendamentos encontrados no backend`)
+
+            // Verificar dados PIX do primeiro item
+            if (result.data.length > 0) {
+              const firstItem = result.data[0]
+              console.log("🔍 [LOAD] Primeiro item - dados PIX:", {
+                id: firstItem.id,
+                qr_code_pix: firstItem.qr_code_pix ? "PRESENTE" : "AUSENTE",
+                copy_paste_pix: firstItem.copy_paste_pix ? "PRESENTE" : "AUSENTE",
+                pix_expires_at: firstItem.pix_expires_at,
+                status: firstItem.status,
+                payment_status: firstItem.payment_status
+              })
+            }
             // Converter formato do backend para o frontend
             type BackendConsulta = {
               id: string
@@ -110,11 +129,33 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
 
             const consultasConvertidas = (result.data as BackendConsulta[]).map(
               (item) => {
+                // Mapeamento de status do backend para o frontend
+                const mapBackendStatus = (backendStatus: string, paymentStatus: string): ConsultaAgendada["status"] => {
+                  // Se o payment_status for RECEIVED, CONFIRMED ou PAID, o agendamento deve ser CONFIRMED
+                  if (paymentStatus === 'RECEIVED' || paymentStatus === 'CONFIRMED' || paymentStatus === 'PAID') {
+                    return "CONFIRMED"
+                  }
+                  
+                  switch (backendStatus) {
+                    case "pending_payment":
+                      return "PENDING"
+                    case "confirmed":
+                      return "CONFIRMED"
+                    case "cancelled":
+                      return "CANCELLED"
+                    case "expired":
+                      return "EXPIRED"
+                    default:
+                      console.log('⚠️ Status desconhecido do backend:', backendStatus, 'Payment status:', paymentStatus)
+                      return "PENDING" // fallback
+                  }
+                }
+
                 const converted = {
                   id: item.id,
                   data: item.data,
                   horario: item.horario,
-                  status: item.status,
+                  status: mapBackendStatus(item.status, item.payment_status),
                   paymentId: item.payment_id,
                   paymentStatus: item.payment_status,
                   valor: parseFloat(String(item.valor || 0)),
@@ -132,24 +173,10 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   googleMeetLink: item.googleMeetLink,
                 };
 
-                console.log(`🔄 Conversão do agendamento ${item.id}:`, {
-                  original_google_meet_link: item.googleMeetLink,
-                  converted_google_meet_link: converted.googleMeetLink,
-                  original_status: item.status,
-                  converted_status: converted.status,
-                  original_calendar_event_id: item.calendar_event_id,
-                  converted_calendar_event_id: converted.calendarEventId,
-                  // Análises detalhadas do link
-                  link_type: typeof item.googleMeetLink,
-                  link_length: item.googleMeetLink?.length,
-                  link_is_empty: item.googleMeetLink === "",
-                  link_is_null: item.googleMeetLink === null,
-                  link_is_undefined: item.googleMeetLink === undefined,
-                  link_trimmed: item.googleMeetLink?.trim(),
-                  link_trimmed_empty: item.googleMeetLink?.trim() === "",
-                  has_valid_link: item.googleMeetLink && item.googleMeetLink.trim() !== "",
-                  status_is_confirmed: item.status === "CONFIRMED",
-                  has_calendar_event: !!item.calendar_event_id
+                console.log(`✅ Agendamento ${item.id} convertido com sucesso:`, {
+                  status: converted.status,
+                  qrCodePix: converted.qrCodePix ? "PRESENTE" : "AUSENTE",
+                  copyPastePix: converted.copyPastePix ? "PRESENTE" : "AUSENTE",
                 });
 
                 return converted;
@@ -342,17 +369,63 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
   }
 
   const formatStatus = (status: ConsultaAgendada["status"]) => {
+    console.log('🔍 [DEBUG] formatStatus chamado com:', {
+      status,
+      type: typeof status,
+      isString: typeof status === 'string',
+      length: status?.length,
+      upperCase: status?.toUpperCase()
+    });
+
     switch (status) {
       case 'PENDING':
-        return { text: 'AGUARDANDO', variant: 'pending' as const }
+        console.log('✅ [DEBUG] Status identificado como PENDING');
+        return { 
+          text: 'AGUARDANDO PAGAMENTO', 
+          variant: 'pending' as const,
+          description: 'Pagamento pendente - prazo de 24h',
+          icon: '⏳',
+          color: 'yellow'
+        }
       case 'CONFIRMED':
-        return { text: 'CONFIRMADO', variant: 'confirmed' as const }
+        console.log('✅ [DEBUG] Status identificado como CONFIRMED');
+        return { 
+          text: 'CONFIRMADO', 
+          variant: 'confirmed' as const,
+          description: 'Consulta confirmada e agendada',
+          icon: '✅',
+          color: 'green'
+        }
       case 'CANCELLED':
-        return { text: 'CANCELADO', variant: 'cancelled' as const }
+        console.log('✅ [DEBUG] Status identificado como CANCELLED');
+        return { 
+          text: 'CANCELADO', 
+          variant: 'cancelled' as const,
+          description: 'Agendamento foi cancelado',
+          icon: '❌',
+          color: 'red'
+        }
       case 'EXPIRED':
-        return { text: 'EXPIRADO', variant: 'expired' as const }
+        console.log('✅ [DEBUG] Status identificado como EXPIRED');
+        return { 
+          text: 'EXPIRADO', 
+          variant: 'expired' as const,
+          description: 'Prazo de pagamento expirou',
+          icon: '⏰',
+          color: 'gray'
+        }
       default:
-        return { text: 'INDEFINIDO', variant: 'expired' as const }
+        console.log('❌ [DEBUG] Status NÃO identificado, caindo no default:', {
+          status,
+          statusType: typeof status
+        });
+        return { 
+          text: 'INDEFINIDO', 
+          variant: 'expired' as const,
+          description: 'Status desconhecido',
+          icon: '❓',
+          color: 'gray'
+        }
     }
   }
 

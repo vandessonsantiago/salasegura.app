@@ -1,18 +1,52 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CheckoutComponent from '../payments/CheckoutComponent';
 import { useDivorce } from '@/contexts/DivorceContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDivorceCheckout } from '@/hooks/useSpecializedCheckout';
 
 interface DivorcioExpressModalProps {
   isOpen: boolean;
   onClose: () => void;
+  existingCaseId?: string; // Novo prop para caso existente
 }
 
-export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpressModalProps) {
+export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }: DivorcioExpressModalProps) {
   const [showCheckout, setShowCheckout] = useState(false);
-  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
-  const { createCase, updatePaymentInfo } = useDivorce();
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(existingCaseId || null);
+  const { updatePaymentInfo, currentCase, divorceCases, createCaseWithPayment } = useDivorce();
   const { user } = useAuth();
+  const divorceCheckout = useDivorceCheckout();
+
+  console.log("🎯 [FRONTEND] DivorcioExpressModal inicializado");
+  console.log("📥 [FRONTEND] existingCaseId:", existingCaseId);
+  console.log("📋 [FRONTEND] currentCaseId:", currentCaseId);
+  console.log("👤 [FRONTEND] User ID:", user?.id);
+
+  // Encontrar o caso atual (seja existente ou o mais recente)
+  const activeCase = existingCaseId 
+    ? divorceCases.find(c => c.id === existingCaseId)
+    : currentCase || divorceCases.find(c => ['pending_payment', 'payment_confirmed', 'in_progress'].includes(c.status));
+
+  // Verificar se o caso tem PIX válido
+  const hasValidPix = activeCase?.qrCodePix && 
+                     activeCase?.copyPastePix && 
+                     activeCase?.pixExpiresAt && 
+                     new Date(activeCase.pixExpiresAt) > new Date();
+
+  // Se temos um existingCaseId, usar ele
+  useEffect(() => {
+    if (existingCaseId) {
+      setCurrentCaseId(existingCaseId);
+    }
+  }, [existingCaseId]);
+
+  // Se temos um caso com PIX válido, ir direto para o checkout
+  useEffect(() => {
+    if (activeCase && hasValidPix && !showCheckout) {
+      setCurrentCaseId(activeCase.id);
+      setShowCheckout(true);
+    }
+  }, [activeCase, hasValidPix, showCheckout]);
 
   if (!isOpen) return null;
 
@@ -25,22 +59,49 @@ export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpres
             productName="Divórcio Express"
             productDescription="Serviço de divórcio consensual simples e 100% guiado."
             customerId={user?.id || ''}
-            agendamentoId={currentCaseId || undefined}
+            checkoutHook={divorceCheckout}
             onSuccess={async (paymentId, status, paymentData) => {
-              console.log('Pagamento bem-sucedido:', paymentId, status, paymentData);
+              console.log("✅ [FRONTEND] Pagamento processado com sucesso!");
+              console.log("💳 [FRONTEND] Payment ID:", paymentId);
+              console.log("📊 [FRONTEND] Status:", status);
+              console.log("📋 [FRONTEND] Payment Data:", paymentData);
+              console.log("📅 [FRONTEND] Current Case ID:", currentCaseId);
 
-              // Atualizar informações de pagamento no caso
-              if (currentCaseId && paymentData) {
-                await updatePaymentInfo(currentCaseId, {
-                  paymentId,
-                  qrCodePix: paymentData.qrCode || '',
-                  copyPastePix: paymentData.copyPaste || '',
-                  pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-                });
+              if (paymentData) {
+                if (currentCaseId) {
+                  // Atualizar caso existente
+                  await updatePaymentInfo(currentCaseId, {
+                    paymentId,
+                    qrCodePix: paymentData.qrCode || '',
+                    copyPastePix: paymentData.copyPaste || '',
+                    pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                  });
+                } else {
+                  // Criar novo caso com dados completos
+                  const newCase = await createCaseWithPayment({
+                    paymentId,
+                    qrCodePix: paymentData.qrCode || '',
+                    copyPastePix: paymentData.copyPaste || '',
+                    pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                  });
+
+                  if (newCase) {
+                    setCurrentCaseId(newCase.id);
+                  }
+                }
+
+                // Se o pagamento foi confirmado, atualizar o status do caso
+                if (status === 'CONFIRMED' && currentCaseId) {
+                  // Aqui podemos adicionar lógica para atualizar o status do caso para 'payment_confirmed'
+                  console.log('Pagamento confirmado! Caso pode ser atualizado para payment_confirmed');
+                }
               }
 
-              setShowCheckout(false);
-              onClose();
+              // Fechar modal apenas se o pagamento foi confirmado
+              if (status === 'CONFIRMED') {
+                setShowCheckout(false);
+                onClose();
+              }
             }}
             onError={(errorMessage) => {
               console.error('Erro no pagamento:', errorMessage);
@@ -49,6 +110,12 @@ export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpres
               console.log('Pagamento cancelado');
               setShowCheckout(false);
             }}
+            existingPixData={hasValidPix && activeCase ? {
+              qrCodePix: activeCase.qrCodePix,
+              copyPastePix: activeCase.copyPastePix,
+              pixExpiresAt: activeCase.pixExpiresAt,
+              paymentId: activeCase.paymentId
+            } : undefined}
           />
         ) : (
           <>
@@ -160,20 +227,32 @@ export default function DivorcioExpressModal({ isOpen, onClose }: DivorcioExpres
                   >
                     Fechar
                   </button>
-                  <button
+                                    <button
                     className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-105"
                     onClick={async () => {
                       if (!user) return;
 
-                      // Criar caso de divórcio
-                      const newCase = await createCase();
-                      if (newCase) {
-                        setCurrentCaseId(newCase.id);
+                      // Se já temos um caso com PIX válido, ir direto para checkout
+                      if (activeCase && hasValidPix) {
+                        setCurrentCaseId(activeCase.id);
                         setShowCheckout(true);
+                        return;
                       }
+
+                      // Se temos um caso sem PIX válido, usar ele mas ir para checkout
+                      if (activeCase) {
+                        setCurrentCaseId(activeCase.id);
+                        setShowCheckout(true);
+                        return;
+                      }
+
+                      // Se não temos caso, ir direto para checkout (será criado automaticamente)
+                      console.log("🏗️ [FRONTEND] Iniciando checkout consolidado...");
+                      setShowCheckout(true);
                     }}
                   >
-                    Contratar agora
+                    {activeCase && hasValidPix ? 'Retomar Pagamento' : 
+                     activeCase ? 'Continuar Pagamento' : 'Contratar agora'}
                   </button>
                 </div>
               </div>

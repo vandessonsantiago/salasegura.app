@@ -1,8 +1,9 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import { X, Users, CheckCircle, Clock, FileText, ChatCircle } from '@phosphor-icons/react'
 import { useDivorce } from '@/contexts/DivorceContext'
+import DivorcioExpressModal from './DivorcioExpressModal'
 
 interface MeuDivorcioModalProps {
   isOpen: boolean
@@ -11,13 +12,14 @@ interface MeuDivorcioModalProps {
 
 export default function MeuDivorcioModal({ isOpen, onClose }: MeuDivorcioModalProps) {
   const { currentCase, formatStatus } = useDivorce()
+  const [showDivorcioExpressModal, setShowDivorcioExpressModal] = useState(false)
 
   if (!isOpen || !currentCase) return null
 
   const statusInfo = formatStatus(currentCase.status)
 
-  const getStatusIcon = () => {
-    switch (currentCase.status) {
+  const getStatusIcon = (status: string) => {
+    switch (status) {
       case 'pending_payment':
         return <Clock size={20} className="text-orange-500" />
       case 'payment_confirmed':
@@ -31,18 +33,18 @@ export default function MeuDivorcioModal({ isOpen, onClose }: MeuDivorcioModalPr
     }
   }
 
-  const getStatusMessage = () => {
-    switch (currentCase.status) {
+  const getStatusMessage = (status: string) => {
+    switch (status) {
       case 'pending_payment':
-        return 'Estamos aguardando a confirmação do seu pagamento PIX.'
+        return 'Aguardando confirmação do pagamento PIX'
       case 'payment_confirmed':
-        return 'Pagamento confirmado! Seu processo de divórcio foi iniciado.'
+        return 'Pagamento confirmado! Seu processo foi iniciado'
       case 'in_progress':
-        return 'Seu processo de divórcio está em andamento. Entraremos em contato em breve.'
+        return 'Seu divórcio está em andamento'
       case 'completed':
         return 'Seu divórcio foi concluído com sucesso!'
       default:
-        return 'Status do processo em análise.'
+        return 'Status desconhecido'
     }
   }
 
@@ -77,25 +79,13 @@ export default function MeuDivorcioModal({ isOpen, onClose }: MeuDivorcioModalPr
           {/* Status Card */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                {getStatusIcon()}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-lg font-semibold text-gray-900">
-                    Status: {statusInfo.text}
-                  </span>
-                  <span className={`
-                    px-3 py-1 rounded-full text-sm font-medium
-                    ${statusInfo.variant === 'pending' ? 'bg-orange-100 text-orange-700' :
-                      statusInfo.variant === 'confirmed' ? 'bg-green-100 text-green-700' :
-                      'bg-gray-100 text-gray-700'}
-                  `}>
-                    {statusInfo.text}
-                  </span>
-                </div>
-                <p className="text-gray-600">
-                  {getStatusMessage()}
+              {getStatusIcon(currentCase.status)}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Status: {statusInfo.text}
+                </h3>
+                <p className="text-gray-600 mt-1">
+                  {getStatusMessage(currentCase.status)}
                 </p>
               </div>
             </div>
@@ -110,7 +100,7 @@ export default function MeuDivorcioModal({ isOpen, onClose }: MeuDivorcioModalPr
 
             <div className="grid gap-4">
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                <span className="text-gray-600">ID do Processo</span>
+                <span className="text-gray-600">ID do Caso</span>
                 <span className="font-mono text-sm text-gray-900">{currentCase.id.slice(0, 8)}...</span>
               </div>
 
@@ -130,6 +120,29 @@ export default function MeuDivorcioModal({ isOpen, onClose }: MeuDivorcioModalPr
               </div>
             </div>
           </div>
+
+          {/* Pagamento Pendente */}
+          {currentCase.status === 'pending_payment' && (
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Clock size={20} className="text-orange-600" />
+                Pagamento Pendente
+              </h3>
+
+              <p className="text-gray-700 mb-4">
+                Você iniciou o processo de divórcio, mas ainda não concluiu o pagamento.
+                Clique no botão abaixo para retomar e gerar o PIX.
+              </p>
+
+              <button 
+                onClick={() => setShowDivorcioExpressModal(true)}
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-200 font-medium text-sm shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
+              >
+                <Clock size={18} />
+                Retomar Pagamento
+              </button>
+            </div>
+          )}
 
           {/* Próximos Passos */}
           {currentCase.status === 'payment_confirmed' && (
@@ -208,6 +221,11 @@ export default function MeuDivorcioModal({ isOpen, onClose }: MeuDivorcioModalPr
           </div>
         </div>
       </div>
+      <DivorcioExpressModal
+        isOpen={showDivorcioExpressModal}
+        onClose={() => setShowDivorcioExpressModal(false)}
+        existingCaseId={currentCase.id}
+      />
     </div>
   )
 }

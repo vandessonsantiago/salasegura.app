@@ -36,15 +36,30 @@ export default function MeusAgendamentosCards({ onAbrirModal }: MeusAgendamentos
   const getStatusText = (status: string) => {
     switch (status) {
       case 'CONFIRMED':
-        return 'Confirmado'
+        return 'Consulta Confirmada'
       case 'PENDING':
-        return 'Pendente'
+        return 'Aguardando Pagamento'
       case 'CANCELLED':
-        return 'Cancelado'
+        return 'Agendamento Cancelado'
       case 'EXPIRED':
-        return 'Expirado'
+        return 'Pagamento Expirado'
       default:
         return status
+    }
+  }
+
+  const getStatusDescription = (status: string, consulta: any) => {
+    switch (status) {
+      case 'PENDING':
+        return 'Realize o pagamento PIX em até 24 horas para confirmar sua consulta'
+      case 'CONFIRMED':
+        return 'Sua consulta está confirmada e o link da reunião será enviado em breve'
+      case 'CANCELLED':
+        return 'Este agendamento foi cancelado'
+      case 'EXPIRED':
+        return 'O prazo para pagamento expirou. Refaça o agendamento se necessário'
+      default:
+        return ''
     }
   }
 
@@ -113,6 +128,11 @@ export default function MeusAgendamentosCards({ onAbrirModal }: MeusAgendamentos
                     <p className="text-white/90 text-sm">
                       {getStatusText(consulta.status)}
                     </p>
+                    {consulta.status === 'PENDING' && (
+                      <p className="text-white/80 text-xs mt-1">
+                        Prazo: 24h para pagamento
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -194,11 +214,25 @@ export default function MeusAgendamentosCards({ onAbrirModal }: MeusAgendamentos
                 </div>
               </div>
 
-              {/* Descrição */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-600 uppercase tracking-wide font-medium mb-2">Descrição</p>
-                <p className="text-gray-900">{consulta.descricao || 'Consulta de alinhamento inicial'}</p>
-              </div>
+              {/* Informações adicionais para status pendente */}
+              {consulta.status === 'PENDING' && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mt-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <CurrencyDollarIcon size={16} className="text-blue-600" weight="fill" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 uppercase tracking-wide font-medium">Valor a pagar</p>
+                      <p className="font-bold text-blue-800 text-lg">R$ {consulta.valor.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <p className="text-blue-700 text-sm">
+                      💡 <strong>Dica:</strong> Após o pagamento, a confirmação pode levar até 5 minutos
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Ações */}
               <div className="space-y-3">
@@ -214,13 +248,43 @@ export default function MeusAgendamentosCards({ onAbrirModal }: MeusAgendamentos
 
                 {consulta.status === 'PENDING' && (
                   <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3">
                       <div className="bg-yellow-200 p-2 rounded-lg">
                         <ClockIcon size={16} className="text-yellow-700" weight="fill" />
                       </div>
-                      <div>
-                        <p className="font-semibold text-yellow-800">Aguardando confirmação</p>
-                        <p className="text-yellow-700 text-sm">O pagamento deve ser realizado em até 24 horas</p>
+                      <div className="flex-1">
+                        <p className="font-semibold text-yellow-800 mb-1">
+                          Aguardando confirmação do pagamento
+                        </p>
+                        <p className="text-yellow-700 text-sm mb-3">
+                          {getStatusDescription(consulta.status, consulta)}
+                        </p>
+                        {consulta.copyPastePix && (
+                          <div className="bg-white rounded-lg p-3 border border-yellow-300">
+                            <p className="text-xs text-gray-600 mb-2 font-medium">Código PIX para copiar:</p>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 text-xs bg-gray-100 p-2 rounded font-mono text-gray-800 break-all">
+                                {consulta.copyPastePix}
+                              </code>
+                              <button
+                                onClick={() => {
+                                  if (consulta.copyPastePix) {
+                                    navigator.clipboard.writeText(consulta.copyPastePix)
+                                    // Você pode adicionar um toast de sucesso aqui
+                                  }
+                                }}
+                                className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                              >
+                                Copiar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {consulta.pixExpiresAt && (
+                          <p className="text-yellow-600 text-xs mt-2">
+                            Expira em: {new Date(consulta.pixExpiresAt).toLocaleString('pt-BR')}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -31,30 +31,52 @@ export class AgendamentosController {
       }
 
       console.log("📡 Consultando tabela agendamentos para user:", userId);
-      const { data, error } = await supabase
+      // Primeiro buscar agendamentos
+      const { data: agendamentos, error: agendamentosError } = await supabase
         .from("agendamentos")
-        .select(`
-          *,
-          payments (
-            id,
-            asaas_id,
-            status,
-            valor,
-            created_at
-          )
-        `)
+        .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("❌ Erro ao buscar agendamentos:", error);
+      if (agendamentosError) {
+        console.error("❌ Erro ao buscar agendamentos:", agendamentosError);
         res.status(500).json({
           success: false,
           error: "Erro interno do servidor",
-          details: error.message,
+          details: agendamentosError.message,
         });
         return;
       }
+
+      // Buscar payments relacionados se houver agendamentos
+      let paymentsMap: { [key: string]: any } = {};
+      if (agendamentos && agendamentos.length > 0) {
+        const paymentIds = agendamentos
+          .map(a => a.payment_id)
+          .filter(id => id && id.trim() !== "");
+
+        if (paymentIds.length > 0) {
+          const { data: payments, error: paymentsError } = await supabase
+            .from("payments")
+            .select("id, asaas_id, status, valor, created_at")
+            .in("id", paymentIds);
+
+          if (paymentsError) {
+            console.warn("⚠️ Erro ao buscar payments:", paymentsError);
+          } else if (payments) {
+            paymentsMap = payments.reduce((acc, payment) => {
+              acc[payment.id] = payment;
+              return acc;
+            }, {} as { [key: string]: any });
+          }
+        }
+      }
+
+      // Combinar dados
+      const data = agendamentos?.map(agendamento => ({
+        ...agendamento,
+        payments: agendamento.payment_id ? [paymentsMap[agendamento.payment_id]].filter(Boolean) : []
+      }));
 
       console.log("✅ Agendamentos encontrados:", data?.length || 0);
 

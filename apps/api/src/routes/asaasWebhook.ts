@@ -20,8 +20,35 @@ router.post('/', async (req: Request, res: Response) => {
 
     console.log(`📡 Processando webhook: ${event} para pagamento ${payment.id}`);
 
-    // Log do webhook no banco para auditoria
+    // Verificar se este webhook já foi processado (prevenir duplicatas)
     const { supabaseAdmin } = require('../lib/supabase');
+    const { data: existingLog } = await supabaseAdmin
+      .from('webhook_logs')
+      .select('id, status')
+      .eq('payment_id', payment.id)
+      .eq('asaas_event', event)
+      .eq('status', 'processed')
+      .single();
+
+    if (existingLog) {
+      console.log(`⚠️ Webhook já processado anteriormente: ${event} para ${payment.id}`);
+      return res.status(200).json({
+        success: true,
+        message: 'Webhook já processado anteriormente'
+      });
+    }
+
+    // Só processar eventos relevantes de pagamento
+    const relevantEvents = ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_PENDING'];
+    if (!relevantEvents.includes(event)) {
+      console.log(`ℹ️ Evento não relevante ignorado: ${event}`);
+      return res.status(200).json({
+        success: true,
+        message: 'Evento não relevante, ignorado'
+      });
+    }
+
+    // Log do webhook no banco para auditoria
     await supabaseAdmin
       .from('webhook_logs')
       .insert({
@@ -55,8 +82,27 @@ router.post('/', async (req: Request, res: Response) => {
       // Mesmo com erro, continua o processamento
     }
 
+    // Se não encontrou na tabela payments, tentar buscar pelo payment_id no agendamento
+    let agendamentoId = paymentRecord?.agendamento_id;
+    
+    if (!agendamentoId) {
+      console.log(`🔍 Procurando agendamento diretamente pelo payment_id: ${payment.id}`);
+      const { data: agendamento, error: agendamentoError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('id, user_id')
+        .eq('payment_id', payment.id)
+        .single();
+        
+      if (agendamentoError) {
+        console.error('❌ Erro ao buscar agendamento pelo payment_id:', agendamentoError);
+      } else if (agendamento) {
+        agendamentoId = agendamento.id;
+        console.log(`✅ Agendamento encontrado: ${agendamentoId}`);
+      }
+    }
+
     // Se houver agendamento_id, atualizar status do agendamento
-    if (paymentRecord && paymentRecord.agendamento_id) {
+    if (agendamentoId) {
       const agendamentoStatus = payment.status === 'RECEIVED' || payment.status === 'CONFIRMED'
         ? 'CONFIRMED'
         : payment.status;
@@ -68,12 +114,12 @@ router.post('/', async (req: Request, res: Response) => {
           payment_status: payment.status,
           updated_at: new Date().toISOString()
         })
-        .eq('id', paymentRecord.agendamento_id);
+        .eq('id', agendamentoId);
 
       if (agendamentoError) {
         console.error('❌ Erro ao atualizar status do agendamento:', agendamentoError);
       } else {
-        console.log(`✅ Agendamento ${paymentRecord.agendamento_id} atualizado para ${agendamentoStatus}`);
+        console.log(`✅ Agendamento ${agendamentoId} atualizado para ${agendamentoStatus}`);
 
         // Se o agendamento foi confirmado, criar evento no Google Calendar
         if (agendamentoStatus === 'CONFIRMED') {
@@ -82,7 +128,7 @@ router.post('/', async (req: Request, res: Response) => {
             const { data: agendamento, error: agendamentoFetchError } = await supabaseAdmin
               .from('agendamentos')
               .select('*')
-              .eq('id', paymentRecord.agendamento_id)
+              .eq('id', agendamentoId)
               .single();
 
             if (agendamentoFetchError) {
@@ -107,7 +153,7 @@ router.post('/', async (req: Request, res: Response) => {
                 hasMeetLink: !!meetLink,
                 meetLinkLength: meetLink?.length,
                 isEmptyString: meetLink === "",
-                agendamentoId: paymentRecord.agendamento_id
+                agendamentoId: agendamentoId
               });
 
               // Atualizar agendamento com o eventId e meetLink
@@ -120,12 +166,12 @@ router.post('/', async (req: Request, res: Response) => {
                 const { error: updateError } = await supabaseAdmin
                   .from('agendamentos')
                   .update(updateData)
-                  .eq('id', paymentRecord.agendamento_id);
+                  .eq('id', agendamentoId);
 
                 if (updateError) {
                   console.error('❌ Erro ao atualizar agendamento com dados do Google Calendar:', updateError);
                 } else {
-                  console.log(`✅ Agendamento ${paymentRecord.agendamento_id} atualizado com evento do Google Calendar`);
+                  console.log(`✅ Agendamento ${agendamentoId} atualizado com evento do Google Calendar`);
                   if (meetLink) {
                     console.log(`🔗 Link do Google Meet: ${meetLink}`);
                   }
@@ -160,24 +206,31 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('❌ Erro geral no webhook Asaas:', error);
 
-    // Log do erro
-    const { supabaseAdmin } = require('../lib/supabase');
-    await supabaseAdmin
-      .from('webhook_logs')
-      .insert({
-        asaas_event: req.body?.event || 'unknown',
-        payment_id: req.body?.payment?.id || 'unknown',
-        payload: req.body || {},
-        status: 'error',
-        error_message: error instanceof Error ? error.message : 'Erro desconhecido'
-      })
-      .then(({ error: logError }: { error: any }) => {
-        if (logError) console.error('Erro ao salvar log de erro:', logError);
-      });
+    // Sempre retornar uma resposta para evitar looping
+    try {
+      // Log do erro
+      const { supabaseAdmin } = require('../lib/supabase');
+      await supabaseAdmin
+        .from('webhook_logs')
+        .insert({
+          asaas_event: req.body?.event || 'unknown',
+          payment_id: req.body?.payment?.id || 'unknown',
+          payload: req.body || {},
+          status: 'error',
+          error_message: error instanceof Error ? error.message : 'Erro desconhecido'
+        })
+        .then(({ error: logError }: { error: any }) => {
+          if (logError) console.error('Erro ao salvar log de erro:', logError);
+        });
+    } catch (logError) {
+      console.error('Erro ao salvar log de erro do webhook:', logError);
+    }
 
-    res.status(500).json({
-      error: 'Erro ao processar webhook',
-      details: error instanceof Error ? error.message : 'Erro interno'
+    // Sempre retornar 200 para evitar que o Asaas fique tentando reenviar
+    res.status(200).json({
+      success: false,
+      message: 'Erro ao processar webhook, mas reconhecido',
+      error: error instanceof Error ? error.message : 'Erro interno'
     });
   }
 });

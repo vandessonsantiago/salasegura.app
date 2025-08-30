@@ -39,6 +39,10 @@ export default function MeusAgendamentosModal({
   const [selectedConsulta, setSelectedConsulta] =
     useState<ConsultaAgendada | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [feedbackMessage, setFeedbackMessage] = useState<{
+    type: 'success' | 'error' | 'info'
+    message: string
+  } | null>(null)
 
   // Auto-refresh a cada 30 segundos quando o modal está aberto
   useEffect(() => {
@@ -101,10 +105,19 @@ export default function MeusAgendamentosModal({
   const handleReabrirPix = (consulta: ConsultaAgendada) => {
     console.log("🔍 Reabrindo PIX para consulta:", consulta.id)
     console.log("🔍 Dados PIX da consulta:", {
-      qrCodePix: consulta.qrCodePix?.substring(0, 50) + "...",
-      copyPastePix: consulta.copyPastePix?.substring(0, 50) + "...",
+      qrCodePix: consulta.qrCodePix ? "PRESENTE" : "AUSENTE",
+      copyPastePix: consulta.copyPastePix ? "PRESENTE" : "AUSENTE",
       pixExpiresAt: consulta.pixExpiresAt,
     })
+
+    // Verificar se os dados estão válidos
+    if (!consulta.qrCodePix || consulta.qrCodePix.trim() === "") {
+      console.error("❌ QR Code PIX ainda não disponível!")
+      // Em vez de alert, vamos mostrar a tela de erro elegante que criamos
+      setSelectedConsulta(consulta)
+      return
+    }
+
     setSelectedConsulta(consulta)
   }
 
@@ -112,7 +125,11 @@ export default function MeusAgendamentosModal({
     if (googleMeetLink) {
       window.open(googleMeetLink, "_blank")
     } else {
-      alert("Link da reunião não disponível")
+      setFeedbackMessage({
+        type: 'error',
+        message: 'Link da reunião não disponível no momento.'
+      })
+      setTimeout(() => setFeedbackMessage(null), 5000)
     }
   }
 
@@ -129,20 +146,44 @@ export default function MeusAgendamentosModal({
       if (data.status === 'CONFIRMED' || data.status === 'RECEIVED') {
         // Atualizar status no contexto e forçar refresh do banco
         await refresh()
-        alert('Pagamento confirmado com sucesso! Status atualizado.')
+        setFeedbackMessage({
+          type: 'success',
+          message: 'Pagamento confirmado com sucesso! Status atualizado.'
+        })
+        setTimeout(() => setFeedbackMessage(null), 5000)
       } else if (data.status === 'PENDING') {
-        alert('Pagamento ainda está pendente. Aguarde a confirmação ou tente novamente em alguns instantes.')
+        setFeedbackMessage({
+          type: 'info',
+          message: 'Pagamento ainda está pendente. Aguarde a confirmação ou tente novamente em alguns instantes.'
+        })
+        setTimeout(() => setFeedbackMessage(null), 5000)
       } else if (data.status === 'REFUNDED' || data.status === 'CANCELLED') {
-        alert('Pagamento foi cancelado ou reembolsado. Entre em contato conosco para mais informações.')
+        setFeedbackMessage({
+          type: 'error',
+          message: 'Pagamento foi cancelado ou reembolsado. Entre em contato conosco para mais informações.'
+        })
+        setTimeout(() => setFeedbackMessage(null), 5000)
       } else {
-        alert(`Status do pagamento: ${data.status}. Entre em contato conosco se precisar de ajuda.`)
+        setFeedbackMessage({
+          type: 'info',
+          message: `Status do pagamento: ${data.status}. Entre em contato conosco se precisar de ajuda.`
+        })
+        setTimeout(() => setFeedbackMessage(null), 5000)
       }
     } catch (error) {
       console.error('Erro ao verificar pagamento:', error)
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        alert('Erro de conexão. Verifique sua internet e tente novamente.')
+        setFeedbackMessage({
+          type: 'error',
+          message: 'Erro de conexão. Verifique sua internet e tente novamente.'
+        })
+        setTimeout(() => setFeedbackMessage(null), 5000)
       } else {
-        alert('Erro ao verificar status do pagamento. Tente novamente.')
+        setFeedbackMessage({
+          type: 'error',
+          message: 'Erro ao verificar status do pagamento. Tente novamente.'
+        })
+        setTimeout(() => setFeedbackMessage(null), 5000)
       }
     }
   }
@@ -252,6 +293,36 @@ export default function MeusAgendamentosModal({
                 <div className="flex items-center gap-3 text-blue-600 bg-blue-50 px-6 py-4 rounded-xl border border-blue-200">
                   <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                   <span className="text-sm font-medium">Atualizando dados do banco...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback Message */}
+            {feedbackMessage && (
+              <div className="mb-6">
+                <div className={`flex items-center gap-3 px-6 py-4 rounded-xl border ${
+                  feedbackMessage.type === 'success'
+                    ? 'text-green-800 bg-green-50 border-green-200'
+                    : feedbackMessage.type === 'error'
+                    ? 'text-red-800 bg-red-50 border-red-200'
+                    : 'text-blue-800 bg-blue-50 border-blue-200'
+                }`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                    feedbackMessage.type === 'success'
+                      ? 'bg-green-100'
+                      : feedbackMessage.type === 'error'
+                      ? 'bg-red-100'
+                      : 'bg-blue-100'
+                  }`}>
+                    {feedbackMessage.type === 'success' ? (
+                      <CheckIcon size={12} weight="bold" className="text-green-600" />
+                    ) : feedbackMessage.type === 'error' ? (
+                      <XIcon size={12} weight="bold" className="text-red-600" />
+                    ) : (
+                      <ClockIcon size={12} weight="bold" className="text-blue-600" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium">{feedbackMessage.message}</span>
                 </div>
               </div>
             )}
@@ -513,6 +584,16 @@ export default function MeusAgendamentosModal({
             </div>
 
             <div className="p-6">
+              {(() => {
+                console.log("🎯 MODAL PIX ABERTO - Verificando dados:", {
+                  id: selectedConsulta.id,
+                  qrCodePix: selectedConsulta.qrCodePix ? "PRESENTE" : "AUSENTE",
+                  copyPastePix: selectedConsulta.copyPastePix ? "PRESENTE" : "AUSENTE",
+                  pixExpiresAt: selectedConsulta.pixExpiresAt,
+                })
+                return null
+              })()}
+
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <CreditCardIcon size={32} weight="light" className="text-gray-400" />
@@ -584,15 +665,31 @@ export default function MeusAgendamentosModal({
                         })
                         if (!res.ok) {
                           const txt = await res.text()
-                          alert("Erro ao confirmar pagamento: " + txt)
+                          setFeedbackMessage({
+                            type: 'error',
+                            message: `Erro ao confirmar pagamento: ${txt}`
+                          })
+                          setTimeout(() => setFeedbackMessage(null), 5000)
                           return
                         }
-                        alert("Solicitação de confirmação enviada! Aguarde a atualização do status.")
+                        setFeedbackMessage({
+                          type: 'success',
+                          message: 'Solicitação de confirmação enviada! Aguarde a atualização do status.'
+                        })
+                        setTimeout(() => setFeedbackMessage(null), 5000)
                       } catch (err) {
                         if (err instanceof TypeError && err.message.includes('fetch')) {
-                          alert("Erro de conexão. Verifique sua internet e tente novamente.")
+                          setFeedbackMessage({
+                            type: 'error',
+                            message: 'Erro de conexão. Verifique sua internet e tente novamente.'
+                          })
+                          setTimeout(() => setFeedbackMessage(null), 5000)
                         } else {
-                          alert("Erro ao enviar solicitação: " + err)
+                          setFeedbackMessage({
+                            type: 'error',
+                            message: `Erro ao enviar solicitação: ${err}`
+                          })
+                          setTimeout(() => setFeedbackMessage(null), 5000)
                         }
                       }
                     }}
@@ -602,8 +699,42 @@ export default function MeusAgendamentosModal({
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
-                    <p className="text-gray-600 font-medium">QR Code PIX não disponível</p>
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-6 mb-6">
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-lg font-semibold text-red-800">
+                        PIX Indisponível
+                      </h4>
+                    </div>
+                    <p className="text-red-700 text-sm leading-relaxed mb-6">
+                      Não foi possível carregar os dados do PIX neste momento. Isso pode acontecer devido a um problema técnico temporário.
+                    </p>
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => {
+                          setSelectedConsulta(null)
+                          handleRefresh()
+                        }}
+                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-3 rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        🔄 Tentar Novamente
+                      </button>
+                      <button
+                        onClick={() => {
+                          const message = encodeURIComponent(
+                            `Olá! Não consigo visualizar o PIX do meu agendamento. ID: ${selectedConsulta.id}`
+                          )
+                          window.open(`https://wa.me/5511999999999?text=${message}`, '_blank')
+                        }}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-3 rounded-xl text-sm font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        📱 Entrar em Contato
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

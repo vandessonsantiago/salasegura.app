@@ -2,9 +2,42 @@ import express from "express"
 import type { Request, Response } from 'express'
 import axios from "axios"
 import { z } from "zod"
+import { authenticateToken } from '../middleware/auth'
+import { CheckoutService } from '../services/CheckoutService'
 
 import type { Router } from 'express'
 const router: Router = express.Router()
+
+// Tipo para request autenticado
+type AuthenticatedRequest = Request & {
+  user?: {
+    id: string;
+    email: string;
+  };
+};
+
+// Schema para validação de checkout completo (compatível com frontend)
+const checkoutRequestSchema = z.object({
+  customer: z.object({
+    name: z.string().min(2),
+    email: z.string().email(),
+    cpfCnpj: z.string().min(11).max(18),
+    phone: z.string().optional(),
+  }),
+  value: z.number().min(5),
+  description: z.string().min(1),
+  serviceType: z.string().min(1),
+  serviceData: z.any().optional(),
+  billingType: z.string().optional(),
+  dueDate: z.string().optional(),
+  userId: z.string().optional(),
+  // Campos opcionais para data e horário do agendamento
+  data: z.string().optional(),
+  horario: z.string().optional(),
+  // 🔧 CORREÇÃO: Adicionar campos para dados do calendário
+  calendarEventId: z.string().optional(),
+  googleMeetLink: z.string().optional(),
+})
 
 // Configuração Asaas
 const ASAAS_CONFIG = {
@@ -340,85 +373,64 @@ async function createPayment(paymentData: any): Promise<any> {
 }
 
 // Rota POST /api/checkout
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     console.log("📥 Request recebido:", JSON.stringify(req.body, null, 2))
 
-  // Validar request body
-  const validatedData = paymentRequestSchema.parse(req.body)
-  console.log("✅ Dados validados com sucesso. Payload validado:", JSON.stringify(validatedData, null, 2))
-  console.log("▶️ Iniciando fluxo de checkout: buscando/creando cliente -> criando pagamento -> opcional PIX QR")
+    // Validar request body
+    const validatedData = checkoutRequestSchema.parse(req.body)
+    console.log("✅ Dados validados com sucesso. Payload validado:", JSON.stringify(validatedData, null, 2))
 
-    // Defensive runtime check: garantir valor mínimo (caso venha bypassado)
-    if (validatedData.value < 5) {
-      return res.status(400).json({ error: "O valor mínimo para cobrança é 5.00" })
+    // Preparar dados para o CheckoutService (mapeando nomes do frontend)
+    const checkoutData = {
+      cliente: {
+        name: validatedData.customer.name,
+        email: validatedData.customer.email,
+        cpfCnpj: validatedData.customer.cpfCnpj,
+        phone: validatedData.customer.phone || "",
+      },
+      valor: validatedData.value,
+      descricao: validatedData.description,
+      serviceType: validatedData.serviceType,
+      serviceData: validatedData.serviceData || {},
+      // Incluir data e horário se fornecidos
+      data: validatedData.data,
+      horario: validatedData.horario,
+      // 🔧 CORREÇÃO: Incluir dados do calendário se fornecidos
+      calendarEventId: validatedData.calendarEventId,
+      googleMeetLink: validatedData.googleMeetLink,
     }
 
-    // Obter IP do cliente
-    const clientIp =
-      req.headers["x-forwarded-for"] ||
-      req.headers["x-real-ip"] ||
-      req.ip ||
-      "127.0.0.1"
+    console.log("🚀 Iniciando processamento completo do checkout...")
 
-    // Criar ou buscar cliente
-    const customerId = await getOrCreateCustomer(validatedData.customer)
+    // Usar o CheckoutService para processar tudo (agendamento + pagamento)
+    const result = await CheckoutService.processarCheckoutCompleto(req, checkoutData)
 
-    // Preparar dados do pagamento
-    const paymentData = {
-      ...validatedData,
-      customer: customerId, // Usar ID do cliente
-      remoteIp: clientIp,
+    if (!result.success) {
+      console.error("❌ Falha no processamento do checkout:", result.error)
+      return res.status(400).json({ error: result.error })
     }
 
-    // Criar pagamento
-    const payment = await createPayment(paymentData)
-
-    // Inserir registro do pagamento no Supabase
-    try {
-      const { supabaseAdmin } = require('../lib/supabase');
-      const { error } = await supabaseAdmin
-        .from('payments')
-        .insert({
-            asaas_id: payment.id,
-            status: payment.status,
-            valor: payment.value,
-            user_id: validatedData.userId, // UUID do usuário autenticado
-            agendamento_id: validatedData.agendamentoId || null
-        });
-      if (error) {
-        console.error('Erro ao inserir pagamento no Supabase:', error);
-      } else {
-        console.log('Pagamento inserido no Supabase:', payment.id);
-      }
-    } catch (err) {
-      console.error('Erro inesperado ao inserir pagamento no Supabase:', err);
-    }
-
-    // Retornar resposta
-    res.json({
-      id: payment.id,
-      customer: payment.customer,
-      value: payment.value,
-      netValue: payment.netValue,
-      description: payment.description,
-      billingType: payment.billingType,
-      status: payment.status,
-      dueDate: payment.dueDate,
-      originalDueDate: payment.originalDueDate,
-      paymentDate: payment.paymentDate,
-      clientPaymentDate: payment.clientPaymentDate,
-      invoiceUrl: payment.invoiceUrl,
-      bankSlipUrl: payment.bankSlipUrl,
-      transactionReceiptUrl: payment.transactionReceiptUrl,
-      pixQrCode: payment.pixQrCode,
-      pixCopyAndPaste: payment.pixCopyAndPaste,
-      refunded: payment.refunded,
-      refundedValue: payment.refundedValue,
-      refundedDate: payment.refundedDate,
+    console.log("✅ Checkout processado com sucesso!")
+    console.log("📋 Resultado:", {
+      agendamentoId: result.agendamentoId,
+      paymentId: result.paymentId,
+      hasPix: !!result.qrCodePix
     })
+
+    // Retornar resposta completa
+    res.json({
+      success: true,
+      agendamentoId: result.agendamentoId,
+      paymentId: result.paymentId,
+      qrCodePix: result.qrCodePix,
+      copyPastePix: result.copyPastePix,
+      pixExpiresAt: result.pixExpiresAt,
+      message: "Checkout processado com sucesso! Agendamento criado e pagamento gerado."
+    })
+
   } catch (error) {
-    console.error("Erro no checkout:", error)
+    console.error("❌ Erro no checkout:", error)
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({

@@ -1,25 +1,77 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { CopyIcon, CheckIcon, QrCodeIcon, CheckCircleIcon } from "@phosphor-icons/react"
-import { useSimpleCheckout, CheckoutComponentProps } from "@/hooks/useCheckout"
+import { useSimpleCheckout, CheckoutComponentProps, PixData } from "@/hooks/useCheckout"
+
+// Interface para hooks especializados
+interface SpecializedCheckoutHook {
+  formData: {
+    name: string;
+    email: string;
+    cpfCnpj: string;
+    phone: string;
+  };
+  paymentData: PixData | null;
+  isLoading: boolean;
+  handleInputChange: (field: "name" | "email" | "cpfCnpj" | "phone", value: string) => void;
+  generatePix: (value: number, serviceData?: any) => Promise<PixData>;
+  resetCheckout: () => void;
+}
 
 export default function CheckoutComponent({
   value,
   productName,
   productDescription,
   customerId,
-  agendamentoId,
   onSuccess,
   onError,
   onCancel,
-}: CheckoutComponentProps & { agendamentoId?: string }) {
+  existingPixData, // Novo prop para dados PIX existentes
+  checkoutHook, // Novo prop para hook especializado
+}: CheckoutComponentProps & { 
+  existingPixData?: {
+    qrCodePix?: string;
+    copyPastePix?: string;
+    pixExpiresAt?: string;
+    paymentId?: string;
+  };
+  checkoutHook?: SpecializedCheckoutHook;
+}) {
 
-  const [step, setStep] = useState<'form' | 'pix'>('form')
+  console.log("🎯 [FRONTEND] CheckoutComponent inicializado");
+  console.log("💰 [FRONTEND] Value:", value);
+  console.log("📦 [FRONTEND] Product Name:", productName);
+  console.log("📝 [FRONTEND] Product Description:", productDescription);
+  console.log("👤 [FRONTEND] Customer ID:", customerId);
+
+  const [step, setStep] = useState<'form' | 'pix' | 'error'>('form')
+  const [errorMessage, setErrorMessage] = useState<string>('')
   const [copiedPix, setCopiedPix] = useState(false)
   const [paymentVerified, setPaymentVerified] = useState(false)
   const [verifyingPayment, setVerifyingPayment] = useState(false)
+  const [existingPaymentData, setExistingPaymentData] = useState<PixData | null>(null)
+
+  // Verificar se existe PIX válido
+  const hasValidExistingPix = existingPixData?.qrCodePix && 
+                              existingPixData?.copyPastePix && 
+                              existingPixData?.pixExpiresAt && 
+                              new Date(existingPixData.pixExpiresAt) > new Date()
+
+  // Inicializar com dados PIX existentes se válidos
+  useEffect(() => {
+    if (hasValidExistingPix && existingPixData) {
+      const pixData: PixData = {
+        id: existingPixData.paymentId,
+        qrCode: existingPixData.qrCodePix || '',
+        copyPaste: existingPixData.copyPastePix || '',
+        expiresAt: existingPixData.pixExpiresAt || '',
+      }
+      setExistingPaymentData(pixData)
+      setStep('pix')
+    }
+  }, [hasValidExistingPix, existingPixData])
 
   const {
     formData,
@@ -28,12 +80,15 @@ export default function CheckoutComponent({
     handleInputChange,
     generatePix,
     resetCheckout,
-  } = useSimpleCheckout()
+  } = checkoutHook || useSimpleCheckout()
+
+  // Usar dados existentes ou do hook
+  const currentPaymentData = existingPaymentData || paymentData
 
   const handleCopyPix = async () => {
-    if (paymentData?.copyPaste) {
+    if (currentPaymentData?.copyPaste) {
       try {
-        await navigator.clipboard.writeText(paymentData.copyPaste)
+        await navigator.clipboard.writeText(currentPaymentData.copyPaste)
         setCopiedPix(true)
         setTimeout(() => setCopiedPix(false), 2000)
       } catch (err) {
@@ -44,41 +99,20 @@ export default function CheckoutComponent({
 
   // Função para verificar status do pagamento em tempo real
   const handleVerifyPayment = async () => {
-    if (!paymentData?.id) return
+    if (!currentPaymentData?.id) return
 
     setVerifyingPayment(true)
     try {
-      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${paymentData.id}`)
-      if (!response.ok) {
-        throw new Error('Erro ao verificar pagamento')
-      }
-
+      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${currentPaymentData.id}`)
       const data = await response.json()
-      console.log('Status do pagamento:', data)
 
-      if (data.status === 'CONFIRMED' || data.status === 'RECEIVED') {
+      if (data.status === 'CONFIRMED' && !paymentVerified) {
         setPaymentVerified(true)
-        onSuccess(paymentData.id, data.status, paymentData)
-
-        // Fechar modal após 2 segundos
-        setTimeout(() => {
-          onCancel?.()
-        }, 2000)
-      } else if (data.status === 'PENDING') {
-        alert('Pagamento ainda está pendente. Aguarde a confirmação ou tente novamente em alguns instantes.')
-      } else if (data.status === 'REFUNDED' || data.status === 'CANCELLED') {
-        alert('Pagamento foi cancelado ou reembolsado. Entre em contato conosco para mais informações.')
-      } else {
-        alert(`Status do pagamento: ${data.status}. Entre em contato conosco se precisar de ajuda.`)
+        // Atualizar status para CONFIRMED
+        onSuccess(currentPaymentData.id, 'CONFIRMED', currentPaymentData)
       }
     } catch (error) {
       console.error('Erro ao verificar pagamento:', error)
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        alert('Erro de conexão. Verifique sua internet e tente novamente.')
-      } else {
-        alert('Erro ao verificar status do pagamento. Tente novamente.')
-      }
     } finally {
       setVerifyingPayment(false)
     }
@@ -91,23 +125,38 @@ export default function CheckoutComponent({
       return
     }
 
+    console.log("🚀 [FRONTEND] Iniciando geração de PIX...");
+    console.log("📝 [FRONTEND] Form data:", formData);
+    console.log("💰 [FRONTEND] Value sendo enviado:", value);
+
     try {
-      const pixData = await generatePix(value, agendamentoId)
+      const pixData = await generatePix(value)
+      console.log("✅ [FRONTEND] PIX gerado com sucesso!");
+      console.log("📋 [FRONTEND] Dados PIX recebidos:", pixData);
       setStep('pix')
-      // NÃO chamar onSuccess aqui - só quando o pagamento for confirmado
-      // onSuccess(paymentId, 'PENDING', pixData)
+      
+      // Os dados serão salvos no componente pai (DivorcioExpressModal)
+      // através do callback onSuccess
+      if (pixData) {
+        console.log('PIX gerado com sucesso, enviando dados para o componente pai:', pixData)
+        onSuccess(pixData.id || '', 'PENDING', pixData)
+      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      console.error("❌ [FRONTEND] Erro ao gerar PIX:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao gerar PIX'
+      setErrorMessage(errorMessage)
+      setStep('error')
       onError?.(errorMessage)
     }
   }
 
   const handleBack = () => {
-    if (step === 'pix') {
+    if (step === 'pix' || step === 'error') {
       setStep('form')
       resetCheckout()
       setPaymentVerified(false)
       setVerifyingPayment(false)
+      setErrorMessage('')
     } else {
       onCancel?.()
     }
@@ -252,7 +301,7 @@ export default function CheckoutComponent({
     )
   }
 
-  if (step === 'pix' && paymentData) {
+  if (step === 'pix' && currentPaymentData) {
     return (
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[95vh] overflow-hidden shadow-2xl transform transition-all duration-300 scale-100">
         {/* Header */}
@@ -296,7 +345,7 @@ export default function CheckoutComponent({
 
           {/* QR Code */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 mb-8 flex justify-center">
-            <QRCodeSVG value={paymentData.qrCode} size={220} />
+            <QRCodeSVG value={currentPaymentData.qrCode} size={220} />
           </div>
 
           {/* Código PIX Copia e Cola */}
@@ -307,7 +356,7 @@ export default function CheckoutComponent({
             <div className="flex gap-3">
               <input
                 type="text"
-                value={paymentData.copyPaste}
+                value={currentPaymentData.copyPaste}
                 readOnly
                 className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -384,6 +433,149 @@ export default function CheckoutComponent({
                     Já paguei
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'error') {
+    return (
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[95vh] overflow-hidden shadow-2xl transform transition-all duration-300 scale-100">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-red-50 to-pink-50 px-8 py-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                Problema Técnico
+              </h2>
+              <p className="text-gray-600 mt-2">
+                Não foi possível gerar o PIX automaticamente
+              </p>
+            </div>
+            <button
+              onClick={onCancel}
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl p-3 transition-all duration-200"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto max-h-[60vh] px-8 py-6">
+          {/* Mensagem de erro */}
+          <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-6 mb-8">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-red-800 mb-2">
+                  Erro na geração do PIX
+                </h3>
+                <p className="text-red-700 text-sm leading-relaxed">
+                  {errorMessage || "Ocorreu um problema técnico ao gerar o código PIX. Nossa equipe já foi notificada e estamos trabalhando para resolver."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Opções para o usuário */}
+          <div className="space-y-4 mb-8">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">
+              O que você pode fazer:
+            </h4>
+
+            <div className="grid gap-4">
+              {/* Tentar novamente */}
+              <button
+                onClick={() => {
+                  setStep('form')
+                  setErrorMessage('')
+                }}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Tentar Novamente
+              </button>
+
+              {/* Entrar em contato */}
+              <button
+                onClick={() => {
+                  const message = encodeURIComponent(
+                    `Olá! Tive um problema ao gerar o PIX para o valor de R$ ${value.toFixed(2)}. Erro: ${errorMessage || 'Erro desconhecido'}`
+                  )
+                  window.open(`https://wa.me/5511999999999?text=${message}`, '_blank')
+                }}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Entrar em Contato (WhatsApp)
+              </button>
+
+              {/* Email de suporte */}
+              <button
+                onClick={() => {
+                  const subject = encodeURIComponent('Problema na geração do PIX')
+                  const body = encodeURIComponent(
+                    `Olá!\n\nTive um problema ao gerar o PIX no valor de R$ ${value.toFixed(2)}.\n\nErro técnico: ${errorMessage || 'Erro desconhecido'}\n\nDados do formulário:\n- Nome: ${formData.name}\n- Email: ${formData.email}\n- CPF: ${formData.cpfCnpj}\n- Telefone: ${formData.phone}\n\nPor favor, entrem em contato para resolver este problema.\n\nAtenciosamente,\n${formData.name}`
+                  )
+                  window.open(`mailto:suporte@salasegura.com?subject=${subject}&body=${body}`)
+                }}
+                className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-4 rounded-xl text-sm font-semibold hover:from-purple-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Enviar Email de Suporte
+              </button>
+            </div>
+          </div>
+
+          {/* Informações adicionais */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+            <div className="text-center">
+              <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                <strong>Importante:</strong> Mesmo com este problema técnico, você ainda pode prosseguir com seu agendamento.
+              </p>
+              <p className="text-gray-600 text-xs">
+                Nossa equipe entrará em contato em até 24 horas para resolver o pagamento.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gradient-to-r from-gray-50 to-slate-50 px-8 py-8 border-t border-gray-200">
+          <div className="max-w-md mx-auto">
+            <div className="flex flex-col sm:flex-row gap-6 justify-center">
+              <button
+                onClick={handleBack}
+                className="flex-1 px-8 py-4 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 font-medium text-base"
+              >
+                Voltar ao Formulário
+              </button>
+              <button
+                onClick={onCancel}
+                className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-4 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-200 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                Cancelar Agendamento
               </button>
             </div>
           </div>

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { CopyIcon, CheckIcon, QrCodeIcon, CheckCircleIcon } from "@phosphor-icons/react"
-import { useSimpleCheckout, CheckoutComponentProps, PixData } from "@/hooks/useCheckout"
+import { isAsaasPaymentCompleted } from "@/lib/checkout-utils"
+import { PixData, CheckoutComponentProps, useSimpleCheckout } from "@/hooks/useCheckout"
 
 // Interface para hooks especializados
 interface SpecializedCheckoutHook {
@@ -103,6 +104,51 @@ export default function CheckoutComponent({
     }
   }
 
+  // Função para verificar se o status indica pagamento concluído
+  const isPaymentCompleted = (status: string): boolean => {
+    return isAsaasPaymentCompleted(status);
+  };
+
+  // Polling automático para verificar status do pagamento
+  useEffect(() => {
+    if (!currentPaymentData?.id || paymentVerified) {
+      return;
+    }
+
+    console.log("🔄 [FRONTEND] Iniciando polling automático para payment:", currentPaymentData?.id || 'undefined');
+
+    const interval = setInterval(async () => {
+      try {
+        console.log("🔍 [FRONTEND] Verificação automática de status...");
+        const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${currentPaymentData?.id || ''}`);
+
+        if (!response.ok) {
+          console.warn("⚠️ [FRONTEND] Falha na verificação automática:", response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (isPaymentCompleted(data.status) && !paymentVerified) {
+          console.log("✅ [FRONTEND] Pagamento detectado automaticamente!");
+          setPaymentVerified(true);
+          onSuccess(currentPaymentData.id || '', 'CONFIRMED', currentPaymentData);
+          clearInterval(interval); // Para o polling quando confirmado
+        } else {
+          console.log("⏳ [FRONTEND] Status automático:", data.status);
+        }
+      } catch (error) {
+        console.error('Erro na verificação automática:', error);
+      }
+    }, 5000); // Verifica a cada 5 segundos
+
+    // Cleanup: para o interval quando o componente desmonta ou pagamento é confirmado
+    return () => {
+      console.log("🛑 [FRONTEND] Parando polling automático");
+      clearInterval(interval);
+    };
+  }, [currentPaymentData?.id, paymentVerified, onSuccess]);
+
   // Função para verificar status do pagamento em tempo real
   const handleVerifyPayment = async () => {
     console.log("🎯 [FRONTEND] handleVerifyPayment chamado");
@@ -116,18 +162,18 @@ export default function CheckoutComponent({
 
     setVerifyingPayment(true);
     try {
-      console.log(`🔍 [FRONTEND] Fazendo requisição para: http://localhost:8001/api/v1/checkout/status/${currentPaymentData.id}`);
-      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${currentPaymentData.id}`);
+      console.log(`🔍 [FRONTEND] Fazendo requisição para: http://localhost:8001/api/v1/checkout/status/${currentPaymentData?.id || ''}`);
+      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${currentPaymentData?.id || ''}`);
       console.log("📡 [FRONTEND] Resposta da API:", response);
 
       const data = await response.json();
       console.log("📊 [FRONTEND] Dados recebidos:", data);
 
-      if (data.status === 'CONFIRMED' && !paymentVerified) {
+      if (isPaymentCompleted(data.status) && !paymentVerified) {
         console.log("✅ [FRONTEND] Pagamento confirmado!");
         setPaymentVerified(true);
-        // Atualizar status para CONFIRMED
-        onSuccess(currentPaymentData.id, 'CONFIRMED', currentPaymentData);
+        // Atualizar status para CONFIRMED (status interno)
+        onSuccess(currentPaymentData?.id || '', 'CONFIRMED', currentPaymentData);
       } else {
         console.log("⏳ [FRONTEND] Status do pagamento:", data.status);
       }

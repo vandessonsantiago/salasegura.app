@@ -74,8 +74,38 @@ export function getPaymentStatusText(status: string): string {
     [PAYMENT_STATUS.IN_MEDIATION]: "Em mediação",
     [PAYMENT_STATUS.CHARGED_BACK]: "Estornado",
   }
-  
+
   return statusMap[status] || status
+}
+
+/**
+ * Mapeia status do Asaas para status interno do sistema
+ */
+export function mapAsaasStatusToInternal(asaasStatus: string): string {
+  const statusMap: Record<string, string> = {
+    'RECEIVED': PAYMENT_STATUS.APPROVED,
+    'CONFIRMED': PAYMENT_STATUS.APPROVED,
+    'PAID': PAYMENT_STATUS.APPROVED,
+    'COMPLETED': PAYMENT_STATUS.APPROVED,
+    'APPROVED': PAYMENT_STATUS.APPROVED,
+    'PENDING': PAYMENT_STATUS.PENDING,
+    'IN_PROCESS': PAYMENT_STATUS.IN_PROCESS,
+    'IN_MEDIATION': PAYMENT_STATUS.IN_MEDIATION,
+    'REJECTED': PAYMENT_STATUS.REJECTED,
+    'CANCELLED': PAYMENT_STATUS.CANCELLED,
+    'FAILED': PAYMENT_STATUS.FAILED,
+    'CHARGED_BACK': PAYMENT_STATUS.CHARGED_BACK,
+  }
+
+  return statusMap[asaasStatus.toUpperCase()] || asaasStatus
+}
+
+/**
+ * Verifica se o status do Asaas indica pagamento concluído/sucesso
+ */
+export function isAsaasPaymentCompleted(asaasStatus: string): boolean {
+  const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED']
+  return completedStatuses.includes(asaasStatus.toUpperCase())
 }
 
 /**

@@ -64,7 +64,7 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
             productDescription="Serviço de divórcio consensual simples e 100% guiado."
             customerId={user?.id || ''}
             checkoutHook={divorceCheckout}
-            onSuccess={async (paymentId, status, paymentData) => {
+            onSuccess={async (paymentId: string, status: string, paymentData?: { qrCode?: string; copyPaste?: string }) => {
               console.log("✅ [FRONTEND] Pagamento processado com sucesso!");
               console.log("💳 [FRONTEND] Payment ID:", paymentId);
               console.log("📊 [FRONTEND] Status:", status);
@@ -107,7 +107,7 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
                 onClose();
               }
             }}
-            onError={(errorMessage) => {
+            onError={(errorMessage: string) => {
               console.error('Erro no pagamento:', errorMessage);
             }}
             onCancel={() => {

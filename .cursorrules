@@ -1,0 +1,44 @@
+# Regras do Cursor para SalaSegura
+
+## Stack Tecnológico
+- Next.js 15 + TypeScript + Tailwind CSS
+- Supabase + Asaas API (PIX)
+- Monorepo com pnpm workspaces
+
+## Padrões de Código
+- Componentes: PascalCase, arrow functions
+- Hooks: camelCase com prefixo `use`
+- Funções: camelCase
+- Props: Interface obrigatória
+- Eventos: handle + NomeDoEvento
+
+## Estrutura
+- Frontend: `apps/frontend/src/`
+- API: `apps/api/src/`
+- Compartilhado: `packages/`
+
+## Comandos Essenciais
+- `pnpm run dev` - desenvolvimento
+- `pnpm --filter frontend run check-types` - verificar tipos
+- `pnpm --filter frontend run build` - build produção
+
+## Regras Importantes
+- Sempre usar TypeScript strict
+- Interfaces para props de componentes
+- Context API para state management
+- Custom hooks para lógica reutilizável
+- Logs em português para UX, inglês para erros
+- Evitar console.log excessivos em produção
+
+## Funcionalidades Chave
+- Checkout PIX com máscara automática
+- Preenchimento automático de dados
+- Sistema de agendamentos
+- Divórcios express
+- Dashboard do usuário
+
+## Debugging
+- Use prefixos emoji nos logs
+- ERROR/WARN para produção
+- INFO/DEBUG para desenvolvimento</content>
+<parameter name="filePath">/Users/vandessonsantiago/Documents/salasegura/.cursorrules

@@ -141,7 +141,13 @@ export default function MeusAgendamentosModal({
 
   const handleEntrarReuniao = (googleMeetLink?: string) => {
     if (googleMeetLink) {
-      window.open(googleMeetLink, "_blank")
+      // Garantir que o link tenha o protocolo correto
+      let linkToOpen = googleMeetLink.trim();
+      if (!linkToOpen.startsWith('http')) {
+        linkToOpen = `https://${linkToOpen}`;
+      }
+      console.log("🔗 Abrindo link da reunião:", linkToOpen);
+      window.open(linkToOpen, "_blank")
     } else {
       setFeedbackMessage({
         type: 'error',
@@ -494,8 +500,8 @@ export default function MeusAgendamentosModal({
                         const linkIsString = typeof consulta.googleMeetLink === 'string';
                         const linkNotEmpty = consulta.googleMeetLink !== "";
                         const linkNotWhitespace = consulta.googleMeetLink?.trim() !== "";
-                        const linkHasContent = consulta.googleMeetLink?.trim()?.length > 0;
-                        const linkIsValidUrl = consulta.googleMeetLink?.trim()?.startsWith('http');
+                        const linkHasContent = Boolean(consulta.googleMeetLink?.trim() && consulta.googleMeetLink.trim().length > 0);
+                        const linkIsValidUrl = consulta.googleMeetLink?.trim()?.startsWith('http') || consulta.googleMeetLink?.trim()?.includes('meet.google.com');
                         const statusIsConfirmed = consulta.status === "CONFIRMED";
                         const hasCalendarEvent = !!consulta.calendar_event_id;
 
@@ -511,9 +517,9 @@ export default function MeusAgendamentosModal({
                           final_hasValidLink: linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl
                         });
 
-                        // Condição final para exibir o link - com fallback
+                        // Condição final para exibir o link - com fallback mais permissivo
                         const hasValidLink = (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl) ||
-                                           (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && statusIsConfirmed);
+                                           (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && statusIsConfirmed && consulta.googleMeetLink?.trim()?.includes('meet.google.com'));
 
                         console.log("🎯 DECISÃO FINAL:", {
                           hasValidLink,

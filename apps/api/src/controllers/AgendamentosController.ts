@@ -132,7 +132,30 @@ export class AgendamentosController {
           copyPastePix: agendamento.copy_paste_pix,
           pixExpiresAt: agendamento.pix_expires_at,
           calendarEventId: agendamento.calendar_event_id,
-          googleMeetLink: agendamento.google_meet_link?.trim() || null, // Garantir que seja trimmed e null se vazio
+          googleMeetLink: (() => {
+            // Primeiro tenta usar o google_meet_link direto
+            if (agendamento.google_meet_link && agendamento.google_meet_link.trim()) {
+              return agendamento.google_meet_link.trim();
+            }
+            
+            // Se estiver vazio, tenta extrair do service_data
+            if (agendamento.service_data) {
+              try {
+                const serviceData = typeof agendamento.service_data === 'string' 
+                  ? JSON.parse(agendamento.service_data) 
+                  : agendamento.service_data;
+                
+                if (serviceData?.googleMeetLink && serviceData.googleMeetLink.trim()) {
+                  console.log(`🔗 Extraindo link do service_data para agendamento ${agendamento.id}:`, serviceData.googleMeetLink);
+                  return serviceData.googleMeetLink.trim();
+                }
+              } catch (error) {
+                console.error(`❌ Erro ao fazer parse do service_data para agendamento ${agendamento.id}:`, error);
+              }
+            }
+            
+            return null;
+          })(),
           // Incluir dados do pagamento se existir
           payment: agendamento.payments?.[0] || null
         };

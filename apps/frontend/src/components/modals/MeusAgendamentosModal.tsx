@@ -477,8 +477,16 @@ export default function MeusAgendamentosModal({
                           link_is_undefined: consulta.googleMeetLink === undefined,
                           link_trimmed: consulta.googleMeetLink?.trim(),
                           link_trimmed_is_empty: consulta.googleMeetLink?.trim() === "",
+                          link_trimmed_length: consulta.googleMeetLink?.trim()?.length,
                           status_is_confirmed: consulta.status === "CONFIRMED",
-                          has_calendar_event: !!consulta.calendar_event_id
+                          has_calendar_event: !!consulta.calendar_event_id,
+                          // Verificar se é uma URL válida
+                          is_valid_url: consulta.googleMeetLink?.startsWith('http'),
+                          contains_meet: consulta.googleMeetLink?.includes('meet.google.com'),
+                          // Verificar caracteres especiais
+                          has_whitespace: /\s/.test(consulta.googleMeetLink || ''),
+                          has_newlines: /\n/.test(consulta.googleMeetLink || ''),
+                          raw_link_chars: consulta.googleMeetLink?.split('').map(c => c.charCodeAt(0))
                         });
 
                         // Condições de verificação (mais claras e detalhadas)
@@ -486,6 +494,8 @@ export default function MeusAgendamentosModal({
                         const linkIsString = typeof consulta.googleMeetLink === 'string';
                         const linkNotEmpty = consulta.googleMeetLink !== "";
                         const linkNotWhitespace = consulta.googleMeetLink?.trim() !== "";
+                        const linkHasContent = consulta.googleMeetLink?.trim()?.length > 0;
+                        const linkIsValidUrl = consulta.googleMeetLink?.trim()?.startsWith('http');
                         const statusIsConfirmed = consulta.status === "CONFIRMED";
                         const hasCalendarEvent = !!consulta.calendar_event_id;
 
@@ -494,13 +504,15 @@ export default function MeusAgendamentosModal({
                           linkIsString,
                           linkNotEmpty,
                           linkNotWhitespace,
+                          linkHasContent,
+                          linkIsValidUrl,
                           statusIsConfirmed,
                           hasCalendarEvent,
-                          final_hasValidLink: linkExists && linkIsString && linkNotEmpty && linkNotWhitespace
+                          final_hasValidLink: linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl
                         });
 
-                        // Condição final para exibir o link
-                        const hasValidLink = linkExists && linkIsString && linkNotEmpty && linkNotWhitespace;
+                        // Condição final para exibir o link - mais robusta
+                        const hasValidLink = linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl;
 
                         console.log("🎯 DECISÃO FINAL:", {
                           hasValidLink,

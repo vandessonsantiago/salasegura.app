@@ -83,7 +83,7 @@ export class AgendamentosController {
           google_meet_link: agendamento.google_meet_link,
           created_at: agendamento.created_at,
           updated_at: agendamento.updated_at,
-          // Análises do link
+          // Análises detalhadas do link
           google_meet_link_type: typeof agendamento.google_meet_link,
           google_meet_link_length: agendamento.google_meet_link?.length,
           google_meet_link_is_empty: agendamento.google_meet_link === "",
@@ -91,10 +91,15 @@ export class AgendamentosController {
           google_meet_link_is_undefined: agendamento.google_meet_link === undefined,
           google_meet_link_trimmed: agendamento.google_meet_link?.trim(),
           google_meet_link_trimmed_empty: agendamento.google_meet_link?.trim() === "",
+          google_meet_link_trimmed_length: agendamento.google_meet_link?.trim()?.length,
+          google_meet_link_is_valid_url: agendamento.google_meet_link?.trim()?.startsWith('http'),
+          google_meet_link_contains_meet: agendamento.google_meet_link?.includes('meet.google.com'),
+          google_meet_link_has_whitespace: /\s/.test(agendamento.google_meet_link || ''),
+          google_meet_link_has_newlines: /\n/.test(agendamento.google_meet_link || ''),
           // Análises do status
           status_is_confirmed: agendamento.status === "CONFIRMED",
           has_calendar_event: !!agendamento.calendar_event_id,
-          has_valid_link: agendamento.google_meet_link && agendamento.google_meet_link.trim() !== ""
+          has_valid_link: agendamento.google_meet_link && agendamento.google_meet_link.trim() !== "" && agendamento.google_meet_link.trim().startsWith('http') && agendamento.google_meet_link.trim().startsWith('http')
         });
       });
       console.log("🔍 === FIM DO LOG DETALHADO ===");
@@ -127,7 +132,7 @@ export class AgendamentosController {
           copyPastePix: agendamento.copy_paste_pix,
           pixExpiresAt: agendamento.pix_expires_at,
           calendarEventId: agendamento.calendar_event_id,
-          googleMeetLink: agendamento.google_meet_link,
+          googleMeetLink: agendamento.google_meet_link?.trim() || null, // Garantir que seja trimmed e null se vazio
           // Incluir dados do pagamento se existir
           payment: agendamento.payments?.[0] || null
         };

@@ -48,34 +48,14 @@ export class AgendamentosController {
         return;
       }
 
-      // Buscar payments relacionados se houver agendamentos
-      let paymentsMap: { [key: string]: any } = {};
-      if (agendamentos && agendamentos.length > 0) {
-        const paymentIds = agendamentos
-          .map(a => a.payment_id)
-          .filter(id => id && id.trim() !== "");
+      // Não precisamos buscar payments relacionados pois o payment_id no agendamento
+      // já é o ID do Asaas, não um UUID da tabela payments local
+      // Os dados de payment_status já estão armazenados diretamente no agendamento
 
-        if (paymentIds.length > 0) {
-          const { data: payments, error: paymentsError } = await supabase
-            .from("payments")
-            .select("id, asaas_id, status, valor, created_at")
-            .in("id", paymentIds);
-
-          if (paymentsError) {
-            console.warn("⚠️ Erro ao buscar payments:", paymentsError);
-          } else if (payments) {
-            paymentsMap = payments.reduce((acc, payment) => {
-              acc[payment.id] = payment;
-              return acc;
-            }, {} as { [key: string]: any });
-          }
-        }
-      }
-
-      // Combinar dados
+      // Combinar dados - payment_id já contém o ID do Asaas diretamente
       const data = agendamentos?.map(agendamento => ({
         ...agendamento,
-        payments: agendamento.payment_id ? [paymentsMap[agendamento.payment_id]].filter(Boolean) : []
+        payments: [] // Não precisamos de payments adicionais pois os dados já estão no agendamento
       }));
 
       console.log("✅ Agendamentos encontrados:", data?.length || 0);

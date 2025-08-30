@@ -133,12 +133,16 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                 const mapBackendStatus = (backendStatus: string, paymentStatus: string): ConsultaAgendada["status"] => {
                   // Se o payment_status indicar pagamento concluído, o agendamento deve ser CONFIRMED
                   const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'];
-                  if (completedStatuses.includes(paymentStatus)) {
+                  if (paymentStatus && completedStatuses.includes(paymentStatus)) {
                     return "CONFIRMED"
                   }
                   
-                  switch (backendStatus) {
+                  // Normalizar o status do backend para lowercase para comparação
+                  const normalizedBackendStatus = backendStatus?.toLowerCase();
+                  
+                  switch (normalizedBackendStatus) {
                     case "pending_payment":
+                    case "pending":
                       return "PENDING"
                     case "confirmed":
                       return "CONFIRMED"
@@ -148,6 +152,10 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                       return "EXPIRED"
                     default:
                       console.log('⚠️ Status desconhecido do backend:', backendStatus, 'Payment status:', paymentStatus)
+                      // Se paymentStatus for undefined mas backendStatus for confirmed, assumir CONFIRMED
+                      if (normalizedBackendStatus === "confirmed") {
+                        return "CONFIRMED"
+                      }
                       return "PENDING" // fallback
                   }
                 }

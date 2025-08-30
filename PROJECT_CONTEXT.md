@@ -188,6 +188,24 @@ rm -rf apps/frontend/.next
 - Histórico de serviços
 - Gestão de pagamentos
 
+### 6. Chat Inteligente
+- Assistente virtual conversacional no landing page
+- Lógica inteligente de detecção de intenção de conversão
+- Respostas contextuais sobre serviços da plataforma
+- Sistema de qualificação de leads (coleta email/telefone)
+- Animação de digitação para melhor UX
+- Histórico de conversas armazenado localmente
+- Detecção automática de palavras-chave para conversão
+
+### 7. Sistema de Checklist para Divórcio
+- Checklist específico para divórcio consensual em cartório
+- Verificação de documentos essenciais antes do cartório
+- Categorias organizadas: elegibilidade, documentos pessoais, filhos, patrimônio, tributação
+- Acompanhamento de progresso com indicador visual
+- Sessões persistidas no banco de dados
+- Modal interativo com explicações detalhadas
+- Validação de prontidão para Escritura Pública
+
 ## 📊 Fluxos de Trabalho Comuns
 
 ### Criando um Novo Componente

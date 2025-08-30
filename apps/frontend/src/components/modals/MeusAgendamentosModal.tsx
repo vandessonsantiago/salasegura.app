@@ -511,15 +511,20 @@ export default function MeusAgendamentosModal({
                           final_hasValidLink: linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl
                         });
 
-                        // Condição final para exibir o link - mais robusta
-                        const hasValidLink = linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl;
+                        // Condição final para exibir o link - com fallback
+                        const hasValidLink = (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl) ||
+                                           (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && statusIsConfirmed);
 
                         console.log("🎯 DECISÃO FINAL:", {
                           hasValidLink,
+                          hasValidUrl: linkIsValidUrl,
+                          hasContent: linkHasContent,
                           action: hasValidLink ? "EXIBIR BOTÃO DA REUNIÃO" :
                                  (hasCalendarEvent && statusIsConfirmed) ? "EXIBIR MENSAGEM DE EVENTO CRIADO" :
                                  statusIsConfirmed ? "EXIBIR MENSAGEM DE AGUARDAR LINK" :
-                                 "NÃO EXIBIR NADA"
+                                 "NÃO EXIBIR NADA",
+                          // Fallback: se tem conteúdo mas não é URL válida, ainda mostrar
+                          fallback_action: (!hasValidLink && linkHasContent && statusIsConfirmed) ? "EXIBIR BOTÃO DA REUNIÃO (FALLBACK)" : "MANTER DECISÃO ORIGINAL"
                         });
                         console.log("🔍 === FIM DA ANÁLISE ===");
 

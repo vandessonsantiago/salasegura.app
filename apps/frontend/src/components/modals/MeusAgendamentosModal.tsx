@@ -152,6 +152,14 @@ export default function MeusAgendamentosModal({
   }
 
   const handleVerificarPagamento = async (consulta: ConsultaAgendada) => {
+    if (!consulta.paymentId) {
+      setFeedbackMessage({
+        type: 'error',
+        message: 'ID do pagamento não encontrado. Não é possível verificar o status.'
+      })
+      return
+    }
+
     try {
       const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${consulta.paymentId}`)
       if (!response.ok) {

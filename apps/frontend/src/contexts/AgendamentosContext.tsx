@@ -17,7 +17,7 @@ export interface ConsultaAgendada {
   data: string
   horario: string
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED"
-  paymentId: string
+  paymentId: string | undefined
   paymentStatus:
     | "PENDING"
     | "CONFIRMED"
@@ -157,7 +157,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   data: item.data,
                   horario: item.horario,
                   status: mapBackendStatus(item.status, item.payment_status),
-                  paymentId: item.payment_id,
+                  paymentId: item.payment_id || undefined,
                   paymentStatus: item.payment_status,
                   valor: parseFloat(String(item.valor || 0)),
                   descricao: item.descricao || 'Agendamento para consulta de alinhamento inicial',
@@ -239,7 +239,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         data: consulta.data,
         horario: consulta.horario,
         status: consulta.status,
-        payment_id: consulta.paymentId,
+        payment_id: consulta.paymentId || null,
         payment_status: consulta.paymentStatus,
         valor: consulta.valor,
         descricao: consulta.descricao,
@@ -267,7 +267,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               data: result.data.data,
               horario: result.data.horario,
               status: result.data.status,
-              paymentId: result.data.payment_id,
+              paymentId: result.data.payment_id || undefined,
               paymentStatus: result.data.payment_status,
               valor: parseFloat(String(result.data.valor)),
               descricao: result.data.descricao,

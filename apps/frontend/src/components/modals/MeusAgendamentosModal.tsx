@@ -161,7 +161,7 @@ export default function MeusAgendamentosModal({
       const data = await response.json()
       console.log('Status do pagamento:', data)
 
-      if (data.status === 'CONFIRMED' || data.status === 'RECEIVED') {
+      if (['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'].includes(data.status)) {
         // Atualizar status no contexto e forçar refresh do banco
         await refresh()
         setFeedbackMessage({

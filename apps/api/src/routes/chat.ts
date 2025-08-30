@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import OpenAI from 'openai';
 import { ChatController } from '../controllers/ChatController';
 import { authenticateToken } from '../middleware/auth';
+import { supabaseAdmin as supabase } from '../lib/supabase';
 
 const router: Router = express.Router();
 
@@ -240,27 +241,86 @@ function buildMessages(request: ChatRequest): any[] {
  */
 router.post('/', async (req, res) => {
   try {
-    const { message, chatHistory = [] }: ChatRequest = req.body;
+    const { message, chatHistory = [], conversationId }: ChatRequest & { conversationId?: string } = req.body;
 
     console.log('📝 Recebida mensagem:', {
       message,
       chatHistoryLength: chatHistory.length,
+      conversationId,
     });
+
+    // Verificar se o usuário está autenticado
+    const authHeader = req.headers?.authorization;
+    const isAuthenticatedRequest = !!authHeader && authHeader.startsWith('Bearer ');
+
+    let userId = null;
+    let currentConversationId = conversationId;
+
+    // Se autenticado, extrair userId do token e gerenciar conversa
+    if (isAuthenticatedRequest) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+          console.warn('⚠️ Token inválido para usuário autenticado');
+        } else {
+          userId = user.id;
+          console.log('🔒 Usuário autenticado:', userId);
+
+          // Se não há conversationId, buscar ou criar uma conversa ativa
+          if (!currentConversationId) {
+            const { data: conversations } = await supabase
+              .from('chat_conversations')
+              .select('id')
+              .eq('user_id', userId)
+              .order('updated_at', { ascending: false })
+              .limit(1);
+
+            if (conversations && conversations.length > 0) {
+              currentConversationId = conversations[0].id;
+              console.log('📂 Usando conversa existente:', currentConversationId);
+            } else {
+              // Criar nova conversa
+              const { data: newConversation, error: createError } = await supabase
+                .from('chat_conversations')
+                .insert({
+                  user_id: userId,
+                  title: `Conversa ${new Date().toLocaleDateString('pt-BR')}`
+                })
+                .select('id')
+                .single();
+
+              if (createError) {
+                console.error('❌ Erro ao criar conversa:', createError);
+              } else {
+                currentConversationId = newConversation.id;
+                console.log('📂 Nova conversa criada:', currentConversationId);
+              }
+            }
+          }
+
+          // Salvar mensagem do usuário
+          if (currentConversationId) {
+            await supabase
+              .from('chat_messages')
+              .insert({
+                conversation_id: currentConversationId,
+                role: 'user',
+                content: message
+              });
+
+            console.log('� Mensagem do usuário salva no banco');
+          }
+        }
+      } catch (authError) {
+        console.error('❌ Erro na autenticação:', authError);
+        userId = null;
+      }
+    }
 
     // Declarar variável finalResponse
     let finalResponse: string;
     let completion: any = null;
-
-    // Verificar se a chave da API está configurada
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('Chave da API OpenAI não configurada');
-    }
-
-    // Detectar intenção de conversão somente para usuários não autenticados
-    const isAuthenticatedRequest = !!req.headers?.authorization;
-    if (isAuthenticatedRequest) {
-      console.log('🔒 Requisição autenticada detectada - pular detecção de conversão');
-    }
     const shouldConvert = isAuthenticatedRequest ? { shouldConvert: false, contactData: { email: '', whatsapp: '' } } : detectConversionIntent(message, chatHistory);
     const contactData = extractContactData(message);
 
@@ -437,7 +497,31 @@ router.post('/', async (req, res) => {
             timestamp: new Date().toISOString(),
           }
         : null,
+      conversationId: currentConversationId, // Incluir ID da conversa na resposta
     };
+
+    // Salvar resposta do assistente se usuário estiver autenticado
+    if (isAuthenticatedRequest && currentConversationId && userId) {
+      try {
+        await supabase
+          .from('chat_messages')
+          .insert({
+            conversation_id: currentConversationId,
+            role: 'assistant',
+            content: finalResponse
+          });
+
+        // Atualizar timestamp da conversa
+        await supabase
+          .from('chat_conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', currentConversationId);
+
+        console.log('💾 Resposta do assistente salva no banco');
+      } catch (saveError) {
+        console.error('❌ Erro ao salvar resposta no banco:', saveError);
+      }
+    }
 
     console.log('📤 Enviando resposta:', {
       responseLength: finalResponse.length,

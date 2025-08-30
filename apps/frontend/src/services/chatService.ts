@@ -22,6 +22,7 @@ interface ChatResponse {
     total_tokens: number;
   };
   conversionData: ConversionData | null;
+  conversationId?: string;
 }
 
 // Versão da API: v1
@@ -29,7 +30,7 @@ import { apiEndpoint } from '@/lib/api';
 const CHAT_ENDPOINT = apiEndpoint('/chat');
 
 export class ChatService {
-  static async sendMessage(message: string, chatHistory: ChatMessage[], token?: string): Promise<ChatResponse> {
+  static async sendMessage(message: string, chatHistory: ChatMessage[], token?: string, conversationId?: string): Promise<ChatResponse> {
     try {
       console.log('🚀 Enviando mensagem para API:', { message, historyLength: chatHistory.length });
       
@@ -49,7 +50,8 @@ export class ChatService {
             type: msg.type,
             content: msg.content,
             timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
-          }))
+          })),
+          ...(conversationId && { conversationId })
         }),
       });
 

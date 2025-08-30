@@ -240,11 +240,15 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
               // After persisting user message (or fallback), call assistant to get response
               try {
-                const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token);
+                const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token, conversation.id);
                     console.log('📤 ChatService.sendMessage (start) response:', assistantResp);
                     setIsThinking(false);
                     setPendingMessage({ id: Date.now().toString() + '-assistant', type: 'assistant', content: assistantResp.response, timestamp: new Date(), conversionData: assistantResp.conversionData || undefined });
                 setIsTyping(true);
+                // Atualizar conversationId se retornado pela API
+                if (assistantResp.conversationId && !currentSessionId) {
+                  setCurrentSessionId(assistantResp.conversationId);
+                }
               } catch (assistantErr) {
                 console.error('Erro ao chamar ChatService (start, after add):', assistantErr);
                 setIsThinking(false);
@@ -253,11 +257,15 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
                   console.error('Erro ao persistir mensagem do usuário (start -> add):', err);
               // If persisting failed (e.g., auth returned HTML/401), fall back to calling ChatService so UX continues
               try {
-                        const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token);
+                        const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token, conversation?.id);
                     console.log('📤 ChatService.sendMessage (start, on add failure) response:', assistantResp);
                     setIsThinking(false);
                     setPendingMessage({ id: Date.now().toString() + '-assistant', type: 'assistant', content: assistantResp.response, timestamp: new Date(), conversionData: assistantResp.conversionData || undefined });
                     setIsTyping(true);
+                    // Atualizar conversationId se retornado pela API
+                    if (assistantResp.conversationId && !currentSessionId) {
+                      setCurrentSessionId(assistantResp.conversationId);
+                    }
               } catch (assistantErr) {
                 console.error('Erro ao chamar ChatService (start, on add failure):', assistantErr);
                 setIsThinking(false);
@@ -269,11 +277,15 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
           console.log('🚨 createConversation error details:', err);
           // If creating conversation failed (often auth/HTML), fall back to calling ChatService so user sees assistant reply
           try {
-            const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token);
+            const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token, currentSessionId || undefined);
             console.log('📤 ChatService.sendMessage (start, on create failure) response:', assistantResp);
             setIsThinking(false);
             setPendingMessage({ id: Date.now().toString() + '-assistant', type: 'assistant', content: assistantResp.response, timestamp: new Date(), conversionData: assistantResp.conversionData || undefined });
             setIsTyping(true);
+            // Atualizar conversationId se retornado pela API
+            if (assistantResp.conversationId && !currentSessionId) {
+              setCurrentSessionId(assistantResp.conversationId);
+            }
           } catch (assistantErr) {
             console.error('Erro ao chamar ChatService (start, on create failure):', assistantErr);
             setIsThinking(false);
@@ -342,7 +354,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       setIsThinking(true);
       try {
         // Chama o backend para obter resposta do assistente
-  const response = await ChatService.sendMessage(message, [...chatMessages, { id: Date.now().toString(), type: 'user', content: message, timestamp: new Date() }], session?.access_token);
+  const response = await ChatService.sendMessage(message, [...chatMessages, { id: Date.now().toString(), type: 'user', content: message, timestamp: new Date() }], session?.access_token, currentSessionId || undefined);
         console.log('📤 ChatService.sendMessage (new unauth) response:', response);
         setIsThinking(false);
         // Adiciona resposta do assistente
@@ -354,6 +366,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
           conversionData: response.conversionData || undefined
         });
         setIsTyping(true);
+        // Atualizar conversationId se retornado pela API
+        if (response.conversationId && !currentSessionId) {
+          setCurrentSessionId(response.conversationId);
+        }
+        // Atualizar conversationId se retornado pela API
+        if (response.conversationId && !currentSessionId) {
+          setCurrentSessionId(response.conversationId);
+        }
       } catch (error) {
         console.error('Erro ChatService.sendMessage (new unauth):', error);
         setIsThinking(false);

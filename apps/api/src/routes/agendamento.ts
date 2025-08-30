@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AgendamentoController } from '../controllers/AgendamentoController';
+import { AgendamentosController } from '../controllers/AgendamentosController';
 import { authenticateToken } from '../middleware/auth';
 
 const router: Router = Router();
@@ -7,16 +7,19 @@ const router: Router = Router();
 // Aplicar middleware de autenticação em todas as rotas
 router.use(authenticateToken);
 
-// Criar agendamento básico
-router.post('/basico', AgendamentoController.criarAgendamentoBasico);
+// Listar agendamentos do usuário
+router.get('/', AgendamentosController.getUserAgendamentos);
+
+// Criar agendamento
+router.post('/', AgendamentosController.createAgendamento);
 
 // Buscar agendamento por ID
-router.get('/:id', AgendamentoController.buscarAgendamento);
+router.get('/:id', AgendamentosController.getAgendamento);
 
-// Listar agendamentos do usuário
-router.get('/', AgendamentoController.listarAgendamentosUsuario);
+// Atualizar agendamento
+router.put('/:id', AgendamentosController.updateAgendamento);
 
-// Atualizar dados do cliente
-router.patch('/:id/cliente', AgendamentoController.atualizarDadosCliente);
+// Deletar agendamento
+router.delete('/:id', AgendamentosController.deleteAgendamento);
 
 export default router;

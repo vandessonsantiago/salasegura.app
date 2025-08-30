@@ -45,7 +45,7 @@ interface AgendamentosContextType {
   loading: boolean
   addConsulta: (consulta: ConsultaAgendada) => Promise<ConsultaAgendada | void>
   updateConsulta: (id: string, updates: Partial<ConsultaAgendada>) => void
-  removeConsulta: (id: string) => void
+  removeConsulta: (id: string) => Promise<void>
   hasConsultas: boolean
   updatePaymentStatusByPaymentId: (
     paymentId: string,
@@ -320,12 +320,38 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const removeConsulta = (id: string) => {
-    setConsultasAgendadas((prev) => {
-      const updated = prev.filter((c) => c.id !== id)
-      saveConsultasToStorage(updated)
-      return updated
-    })
+  const removeConsulta = async (id: string) => {
+    try {
+      console.log(`🗑️ [REMOVE] Removendo agendamento ${id} do backend...`)
+
+      // Fazer chamada para o backend para excluir do banco
+      if (session?.access_token) {
+        const result = await authJsonFetch(
+          `/agendamento/${id}`,
+          session.access_token,
+          { method: 'DELETE' }
+        )
+
+        if (!result || !result.success) {
+          console.error('❌ [REMOVE] Erro ao excluir agendamento do backend:', result?.error)
+          throw new Error(result?.error || 'Erro ao excluir agendamento')
+        }
+
+        console.log('✅ [REMOVE] Agendamento excluído do backend com sucesso')
+      }
+
+      // Remover do estado local
+      setConsultasAgendadas((prev) => {
+        const updated = prev.filter((c) => c.id !== id)
+        saveConsultasToStorage(updated)
+        return updated
+      })
+
+      console.log('✅ [REMOVE] Agendamento removido com sucesso')
+    } catch (error) {
+      console.error('❌ [REMOVE] Erro ao remover agendamento:', error)
+      throw error
+    }
   }
 
   const hasConsultas = consultasAgendadas.length > 0

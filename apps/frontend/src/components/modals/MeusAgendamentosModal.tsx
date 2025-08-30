@@ -91,9 +91,27 @@ export default function MeusAgendamentosModal({
     }
   }
 
-  const handleCancelarConsulta = (consultaId: string) => {
-    if (confirm("Tem certeza que deseja cancelar este agendamento?")) {
-      removeConsulta(consultaId)
+  const handleCancelarConsulta = async (consultaId: string) => {
+    if (!confirm("Tem certeza que deseja cancelar este agendamento?")) {
+      return
+    }
+
+    try {
+      setFeedbackMessage({ type: 'info', message: 'Cancelando agendamento...' })
+      await removeConsulta(consultaId)
+      setFeedbackMessage({ type: 'success', message: 'Agendamento cancelado com sucesso!' })
+
+      // Limpar mensagem após 3 segundos
+      setTimeout(() => setFeedbackMessage(null), 3000)
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error)
+      setFeedbackMessage({
+        type: 'error',
+        message: 'Erro ao cancelar agendamento. Tente novamente.'
+      })
+
+      // Limpar mensagem após 5 segundos
+      setTimeout(() => setFeedbackMessage(null), 5000)
     }
   }
 
@@ -285,6 +303,36 @@ export default function MeusAgendamentosModal({
               </div>
             </div>
           </div>
+
+          {/* Feedback Message */}
+          {feedbackMessage && (
+            <div className={`mx-8 mt-4 px-4 py-3 rounded-xl border ${
+              feedbackMessage.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : feedbackMessage.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : 'bg-blue-50 border-blue-200 text-blue-800'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                  feedbackMessage.type === 'success'
+                    ? 'bg-green-100'
+                    : feedbackMessage.type === 'error'
+                    ? 'bg-red-100'
+                    : 'bg-blue-100'
+                }`}>
+                  {feedbackMessage.type === 'success' ? (
+                    <CheckIcon size={12} weight="bold" className="text-green-600" />
+                  ) : feedbackMessage.type === 'error' ? (
+                    <XIcon size={12} weight="bold" className="text-red-600" />
+                  ) : (
+                    <ClockIcon size={12} weight="bold" className="text-blue-600" />
+                  )}
+                </div>
+                <p className="text-sm font-medium">{feedbackMessage.message}</p>
+              </div>
+            </div>
+          )}
 
           {/* Content */}
           <div className="overflow-y-auto max-h-[60vh] px-8 py-6">

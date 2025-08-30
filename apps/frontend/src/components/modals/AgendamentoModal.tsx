@@ -94,7 +94,20 @@ export default function AgendamentoModal({
 
   const { addConsulta } = useAgendamentos()
   const { user } = useAuth()
-  const appointmentCheckout = useAppointmentCheckout()
+  // Atualizar telefone quando mudar - forçar re-render do hook
+  const [checkoutKey, setCheckoutKey] = useState(0);
+  useEffect(() => {
+    if (clienteTelefone && clienteTelefone.trim() !== "") {
+      console.log("🎯 [AGENDAMENTO] Telefone mudou, forçando atualização:", clienteTelefone);
+      setCheckoutKey(prev => prev + 1);
+    }
+  }, [clienteTelefone]);
+
+  const appointmentCheckout = useAppointmentCheckout({
+    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
+    email: user?.email || "",
+    phone: clienteTelefone || "",
+  }, checkoutKey);
 
   // 🔧 CORREÇÃO: Criar wrapper para o hook que inclui dados do slot selecionado
   const appointmentCheckoutWithSlotData = {
@@ -440,6 +453,11 @@ export default function AgendamentoModal({
             onSuccess={handleCheckoutSuccess}
             onError={handleCheckoutError}
             onCancel={handleCheckoutCancel}
+            initialCustomerData={{
+              name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
+              email: user?.email || "",
+              phone: clienteTelefone || "",
+            }}
           />
         </div>
       </div>

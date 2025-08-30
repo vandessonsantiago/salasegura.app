@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCPF, formatPhone } from '../utils/formatters';
 
 export interface CheckoutFormData {
   name: string;
@@ -18,6 +19,11 @@ export interface CheckoutComponentProps {
   onSuccess: (paymentId: string, status: string, pixData?: { qrCode?: string; copyPaste?: string }) => void;
   onError?: (error: string) => void;
   onCancel?: () => void;
+  initialCustomerData?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
 }
 
 export interface PixData {
@@ -28,20 +34,48 @@ export interface PixData {
 }
 
 // Hook simplificado sem props para uso geral
-export function useSimpleCheckout() {
+export function useSimpleCheckout(initialData?: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  cpfCnpj?: string;
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<CheckoutFormData>({
-    name: '',
-    email: '',
-    cpfCnpj: '',
-    phone: '',
+    name: initialData?.name || '',
+    email: initialData?.email || '',
+    cpfCnpj: initialData?.cpfCnpj || '',
+    phone: initialData?.phone || '',
   });
   const [paymentData, setPaymentData] = useState<PixData | null>(null);
 
+  // Usar ref para controlar se já foi inicializado
+  const isInitialized = useRef(false);
+
+  // Atualizar dados apenas uma vez quando o componente montar
+  useEffect(() => {
+    if (initialData && !isInitialized.current) {
+      setFormData(prev => ({
+        ...prev,
+        ...initialData
+      }));
+      isInitialized.current = true;
+    }
+  }, []); // Dependência vazia para executar apenas uma vez
+
   const handleInputChange = (field: keyof CheckoutFormData, value: string) => {
+    let formattedValue = value;
+
+    // Aplicar máscaras automaticamente
+    if (field === 'cpfCnpj') {
+      formattedValue = formatCPF(value);
+    } else if (field === 'phone') {
+      formattedValue = formatPhone(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: formattedValue
     }));
   };
 

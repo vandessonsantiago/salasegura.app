@@ -30,6 +30,7 @@ export default function CheckoutComponent({
   onCancel,
   existingPixData, // Novo prop para dados PIX existentes
   checkoutHook, // Novo prop para hook especializado
+  initialCustomerData, // Novo prop para dados pré-preenchidos
 }: CheckoutComponentProps & { 
   existingPixData?: {
     qrCodePix?: string;
@@ -38,6 +39,11 @@ export default function CheckoutComponent({
     paymentId?: string;
   };
   checkoutHook?: SpecializedCheckoutHook;
+  initialCustomerData?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
 }) {
 
   console.log("🎯 [FRONTEND] CheckoutComponent inicializado");
@@ -80,7 +86,7 @@ export default function CheckoutComponent({
     handleInputChange,
     generatePix,
     resetCheckout,
-  } = checkoutHook || useSimpleCheckout()
+  } = checkoutHook || useSimpleCheckout(initialCustomerData)
 
   // Usar dados existentes ou do hook
   const currentPaymentData = existingPaymentData || paymentData
@@ -99,17 +105,31 @@ export default function CheckoutComponent({
 
   // Função para verificar status do pagamento em tempo real
   const handleVerifyPayment = async () => {
-    if (!currentPaymentData?.id) return
+    console.log("🎯 [FRONTEND] handleVerifyPayment chamado");
+    console.log("🎯 [FRONTEND] currentPaymentData:", currentPaymentData);
+    console.log("🎯 [FRONTEND] currentPaymentData.id:", currentPaymentData?.id);
 
-    setVerifyingPayment(true)
+    if (!currentPaymentData?.id) {
+      console.log("❌ [FRONTEND] Payment ID não encontrado");
+      return;
+    }
+
+    setVerifyingPayment(true);
     try {
-      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${currentPaymentData.id}`)
-      const data = await response.json()
+      console.log(`🔍 [FRONTEND] Fazendo requisição para: http://localhost:8001/api/v1/checkout/status/${currentPaymentData.id}`);
+      const response = await fetch(`http://localhost:8001/api/v1/checkout/status/${currentPaymentData.id}`);
+      console.log("📡 [FRONTEND] Resposta da API:", response);
+
+      const data = await response.json();
+      console.log("📊 [FRONTEND] Dados recebidos:", data);
 
       if (data.status === 'CONFIRMED' && !paymentVerified) {
-        setPaymentVerified(true)
+        console.log("✅ [FRONTEND] Pagamento confirmado!");
+        setPaymentVerified(true);
         // Atualizar status para CONFIRMED
-        onSuccess(currentPaymentData.id, 'CONFIRMED', currentPaymentData)
+        onSuccess(currentPaymentData.id, 'CONFIRMED', currentPaymentData);
+      } else {
+        console.log("⏳ [FRONTEND] Status do pagamento:", data.status);
       }
     } catch (error) {
       console.error('Erro ao verificar pagamento:', error)
@@ -130,17 +150,17 @@ export default function CheckoutComponent({
     console.log("💰 [FRONTEND] Value sendo enviado:", value);
 
     try {
+      console.log("🚀 [FRONTEND] Chamando generatePix...");
       const pixData = await generatePix(value)
       console.log("✅ [FRONTEND] PIX gerado com sucesso!");
       console.log("📋 [FRONTEND] Dados PIX recebidos:", pixData);
-      setStep('pix')
-      
-      // Os dados serão salvos no componente pai (DivorcioExpressModal)
-      // através do callback onSuccess
+      console.log("🆔 [FRONTEND] PIX ID:", pixData?.id);
+
       if (pixData) {
         console.log('PIX gerado com sucesso, enviando dados para o componente pai:', pixData)
         onSuccess(pixData.id || '', 'PENDING', pixData)
       }
+      setStep('pix')
     } catch (error) {
       console.error("❌ [FRONTEND] Erro ao gerar PIX:", error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao gerar PIX'
@@ -240,13 +260,14 @@ export default function CheckoutComponent({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">CPF/CNPJ</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">CPF</label>
                 <input
                   type="text"
                   value={formData.cpfCnpj}
                   onChange={(e) => handleInputChange('cpfCnpj', e.target.value)}
                   className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   placeholder="000.000.000-00"
+                  maxLength={14}
                   required
                 />
               </div>
@@ -259,6 +280,7 @@ export default function CheckoutComponent({
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   placeholder="(11) 99999-9999"
+                  maxLength={15}
                   required
                 />
               </div>

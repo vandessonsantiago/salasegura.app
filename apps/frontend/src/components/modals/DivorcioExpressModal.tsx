@@ -15,7 +15,11 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(existingCaseId || null);
   const { updatePaymentInfo, currentCase, divorceCases, createCaseWithPayment } = useDivorce();
   const { user } = useAuth();
-  const divorceCheckout = useDivorceCheckout();
+  const divorceCheckout = useDivorceCheckout({
+    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
+    email: user?.email || "",
+    phone: user?.user_metadata?.phone || "",
+  });
 
   console.log("🎯 [FRONTEND] DivorcioExpressModal inicializado");
   console.log("📥 [FRONTEND] existingCaseId:", existingCaseId);
@@ -116,6 +120,11 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
               pixExpiresAt: activeCase.pixExpiresAt,
               paymentId: activeCase.paymentId
             } : undefined}
+            initialCustomerData={{
+              name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
+              email: user?.email || "",
+              phone: user?.user_metadata?.phone || "",
+            }}
           />
         ) : (
           <>

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCPF, formatPhone } from '../utils/formatters';
 
 export interface CheckoutFormData {
   name: string;
@@ -18,20 +19,58 @@ export interface PixData {
 }
 
 // Hook específico para checkout de divórcios
-export function useDivorceCheckout() {
+export function useDivorceCheckout(initialData?: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  cpfCnpj?: string;
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<CheckoutFormData>({
-    name: '',
-    email: '',
-    cpfCnpj: '',
-    phone: '',
+    name: initialData?.name || '',
+    email: initialData?.email || '',
+    cpfCnpj: initialData?.cpfCnpj || '',
+    phone: initialData?.phone || '',
   });
   const [paymentData, setPaymentData] = useState<PixData | null>(null);
 
+  // Usar ref para controlar se já foi inicializado
+  const isInitialized = useRef(false);
+
+  // Atualizar dados apenas uma vez quando o componente montar
+  useEffect(() => {
+    if (initialData && !isInitialized.current) {
+      setFormData(prev => ({
+        ...prev,
+        ...initialData
+      }));
+      isInitialized.current = true;
+    }
+  }, []); // Dependência vazia para executar apenas uma vez
+
+  // Atualizar telefone quando mudar (mesmo após inicialização)
+  useEffect(() => {
+    if (initialData?.phone && isInitialized.current) {
+      setFormData(prev => ({
+        ...prev,
+        phone: initialData.phone || ''
+      }));
+    }
+  }, [initialData?.phone]);
+
   const handleInputChange = (field: keyof CheckoutFormData, value: string) => {
+    let formattedValue = value;
+
+    // Aplicar máscaras automaticamente
+    if (field === 'cpfCnpj') {
+      formattedValue = formatCPF(value);
+    } else if (field === 'phone') {
+      formattedValue = formatPhone(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: formattedValue
     }));
   };
 
@@ -40,10 +79,6 @@ export function useDivorceCheckout() {
   const generatePix = async (value: number, serviceData?: any): Promise<PixData> => {
     setIsLoading(true);
     try {
-      console.log("🎯 [FRONTEND] Gerando PIX para divórcio...");
-      console.log("💰 [FRONTEND] Valor:", value);
-      console.log("👤 [FRONTEND] User ID:", user?.id);
-
       // Primeiro, tente criar pagamento real no backend (/api/v1/checkout)
       try {
         const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // tomorrow YYYY-MM-DD
@@ -65,23 +100,12 @@ export function useDivorceCheckout() {
           userId: user?.id || "", // Adicionar userId ao payload
         };
 
-        console.log("📤 [FRONTEND] Payload para divórcio:");
-        console.log("👤 [FRONTEND] Customer:", payload.customer);
-        console.log("💰 [FRONTEND] Value:", payload.value);
-        console.log("🏛️ [FRONTEND] Service Type:", payload.serviceType);
-
-        console.log("🟢 [FRONTEND] Enviando requisição para divórcio http://localhost:8001/api/v1/checkout")
-        console.log("👤 [FRONTEND] User atual:", user);
-        console.log("🔑 [FRONTEND] Session atual:", session ? "Presente" : "Ausente");
-        console.log("🎫 [FRONTEND] Access token:", session?.access_token ? "Presente" : "Ausente");
-
         const headers: Record<string, string> = { "Content-Type": "application/json" };
 
         // TEMPORÁRIO: Usar token de desenvolvimento se não houver sessão
         const authToken = session?.access_token || 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c';
 
         headers["Authorization"] = `Bearer ${authToken}`;
-        console.log("🔐 [FRONTEND] Token de autenticação incluído:", authToken === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c' ? "TOKEN DEV" : "TOKEN USER");
 
         const res = await fetch("http://localhost:8001/api/v1/checkout", {
           method: "POST",
@@ -96,13 +120,6 @@ export function useDivorceCheckout() {
         }
 
         const json = await res.json()
-        console.log("🟢 [FRONTEND] Backend resposta recebida para divórcio");
-        console.log("📋 [FRONTEND] Payment ID:", json.paymentId);
-        console.log("🏛️ [FRONTEND] Agendamento ID (Case ID):", json.agendamentoId);
-        console.log("📊 [FRONTEND] Status:", json.status);
-        console.log("💰 [FRONTEND] Valor:", json.value);
-        console.log("📅 [FRONTEND] PIX QR Code presente:", !!json.qrCodePix);
-        console.log("📋 [FRONTEND] PIX Copy&Paste presente:", !!json.copyPastePix);
 
         const pixData: PixData = {
           id: json.paymentId,
@@ -122,7 +139,6 @@ export function useDivorceCheckout() {
           throw new Error("Dados PIX incompletos retornados pelo servidor para divórcio. Tente novamente ou entre em contato com o suporte.")
         }
 
-        console.log("✅ PIX data from backend for divorce is valid, using it")
         setPaymentData(pixData)
         return pixData
 
@@ -157,20 +173,71 @@ export function useDivorceCheckout() {
 }
 
 // Hook específico para checkout de agendamentos
-export function useAppointmentCheckout() {
+export function useAppointmentCheckout(initialData?: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  cpfCnpj?: string;
+}, forceUpdate?: number) {
+
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<CheckoutFormData>({
-    name: '',
-    email: '',
-    cpfCnpj: '',
-    phone: '',
+    name: initialData?.name || '',
+    email: initialData?.email || '',
+    cpfCnpj: initialData?.cpfCnpj || '',
+    phone: initialData?.phone || '',
   });
   const [paymentData, setPaymentData] = useState<PixData | null>(null);
 
+  // Usar ref para controlar se já foi inicializado
+  const isInitialized = useRef(false);
+
+  // Atualizar dados quando initialData mudar (mas apenas se ainda não foi inicializado)
+  useEffect(() => {
+    if (initialData && !isInitialized.current) {
+      setFormData({
+        name: initialData.name || '',
+        email: initialData.email || '',
+        cpfCnpj: initialData.cpfCnpj || '',
+        phone: initialData.phone || '',
+      });
+      isInitialized.current = true;
+    }
+  }, [initialData]);
+
+  // Atualizar telefone quando mudar (mesmo após inicialização)
+  useEffect(() => {
+    if (initialData?.phone && isInitialized.current) {
+      setFormData(prev => ({
+        ...prev,
+        phone: initialData.phone || ''
+      }));
+    }
+  }, [initialData?.phone]);
+
+  // Forçar atualização quando forceUpdate mudar
+  useEffect(() => {
+    if (forceUpdate && forceUpdate > 0) {
+      setFormData(prev => ({
+        ...prev,
+        ...initialData
+      }));
+    }
+  }, [forceUpdate, initialData]);
+
   const handleInputChange = (field: keyof CheckoutFormData, value: string) => {
+    let formattedValue = value;
+
+    // Aplicar máscaras automaticamente
+    if (field === 'cpfCnpj') {
+      formattedValue = formatCPF(value);
+    } else if (field === 'phone') {
+      formattedValue = formatPhone(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: formattedValue
     }));
   };
 
@@ -184,12 +251,6 @@ export function useAppointmentCheckout() {
   ): Promise<PixData> => {
     setIsLoading(true);
     try {
-      console.log("🎯 [FRONTEND] Gerando PIX para agendamento...");
-      console.log("💰 [FRONTEND] Valor:", value);
-      console.log("👤 [FRONTEND] User ID:", user?.id);
-      console.log("📅 [FRONTEND] Data:", data);
-      console.log("🕐 [FRONTEND] Horário:", horario);
-
       // Primeiro, tente criar pagamento real no backend (/api/v1/checkout)
       try {
         const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // tomorrow YYYY-MM-DD
@@ -216,25 +277,12 @@ export function useAppointmentCheckout() {
           googleMeetLink: serviceData?.googleMeetLink,
         };
 
-        console.log("📤 [FRONTEND] Payload para agendamento:");
-        console.log("👤 [FRONTEND] Customer:", payload.customer);
-        console.log("💰 [FRONTEND] Value:", payload.value);
-        console.log("🏛️ [FRONTEND] Service Type:", payload.serviceType);
-        console.log("📅 [FRONTEND] Data:", payload.data);
-        console.log("🕐 [FRONTEND] Horário:", payload.horario);
-
-        console.log("🟢 [FRONTEND] Enviando requisição para agendamento http://localhost:8001/api/v1/checkout")
-        console.log("👤 [FRONTEND] User atual:", user);
-        console.log("🔑 [FRONTEND] Session atual:", session ? "Presente" : "Ausente");
-        console.log("🎫 [FRONTEND] Access token:", session?.access_token ? "Presente" : "Ausente");
-
         const headers: Record<string, string> = { "Content-Type": "application/json" };
 
         // TEMPORÁRIO: Usar token de desenvolvimento se não houver sessão
         const authToken = session?.access_token || 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c';
 
         headers["Authorization"] = `Bearer ${authToken}`;
-        console.log("🔐 [FRONTEND] Token de autenticação incluído:", authToken === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c' ? "TOKEN DEV" : "TOKEN USER");
 
         const res = await fetch("http://localhost:8001/api/v1/checkout", {
           method: "POST",
@@ -249,13 +297,6 @@ export function useAppointmentCheckout() {
         }
 
         const json = await res.json()
-        console.log("🟢 [FRONTEND] Backend resposta recebida para agendamento");
-        console.log("📋 [FRONTEND] Payment ID:", json.paymentId);
-        console.log("🏛️ [FRONTEND] Agendamento ID:", json.agendamentoId);
-        console.log("📊 [FRONTEND] Status:", json.status);
-        console.log("💰 [FRONTEND] Valor:", json.value);
-        console.log("📅 [FRONTEND] PIX QR Code presente:", !!json.qrCodePix);
-        console.log("📋 [FRONTEND] PIX Copy&Paste presente:", !!json.copyPastePix);
 
         const pixData: PixData = {
           id: json.paymentId,
@@ -275,7 +316,6 @@ export function useAppointmentCheckout() {
           throw new Error("Dados PIX incompletos retornados pelo servidor para agendamento. Tente novamente ou entre em contato com o suporte.")
         }
 
-        console.log("✅ PIX data from backend for appointment is valid, using it")
         setPaymentData(pixData)
         return pixData
 
@@ -332,10 +372,6 @@ export function useSimpleCheckout() {
   const generatePix = async (value: number): Promise<PixData> => {
     setIsLoading(true);
     try {
-      console.log("🎯 [FRONTEND] Gerando PIX genérico...");
-      console.log("💰 [FRONTEND] Valor:", value);
-      console.log("👤 [FRONTEND] User ID:", user?.id);
-
       // Primeiro, tente criar pagamento real no backend (/api/v1/checkout)
       try {
         const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // tomorrow YYYY-MM-DD
@@ -357,23 +393,12 @@ export function useSimpleCheckout() {
           userId: user?.id || "", // Adicionar userId ao payload
         };
 
-        console.log("📤 [FRONTEND] Payload genérico:");
-        console.log("👤 [FRONTEND] Customer:", payload.customer);
-        console.log("💰 [FRONTEND] Value:", payload.value);
-        console.log("🏛️ [FRONTEND] Service Type:", payload.serviceType);
-
-        console.log("🟢 [FRONTEND] Enviando requisição genérica http://localhost:8001/api/v1/checkout")
-        console.log("👤 [FRONTEND] User atual:", user);
-        console.log("🔑 [FRONTEND] Session atual:", session ? "Presente" : "Ausente");
-        console.log("🎫 [FRONTEND] Access token:", session?.access_token ? "Presente" : "Ausente");
-
         const headers: Record<string, string> = { "Content-Type": "application/json" };
 
         // TEMPORÁRIO: Usar token de desenvolvimento se não houver sessão
         const authToken = session?.access_token || 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c';
 
         headers["Authorization"] = `Bearer ${authToken}`;
-        console.log("🔐 [FRONTEND] Token de autenticação incluído:", authToken === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c' ? "TOKEN DEV" : "TOKEN USER");
 
         const res = await fetch("http://localhost:8001/api/v1/checkout", {
           method: "POST",
@@ -388,13 +413,6 @@ export function useSimpleCheckout() {
         }
 
         const json = await res.json()
-        console.log("🟢 [FRONTEND] Backend resposta recebida genérica");
-        console.log("📋 [FRONTEND] Payment ID:", json.paymentId);
-        console.log("🏛️ [FRONTEND] Agendamento ID:", json.agendamentoId);
-        console.log("📊 [FRONTEND] Status:", json.status);
-        console.log("💰 [FRONTEND] Valor:", json.value);
-        console.log("📅 [FRONTEND] PIX QR Code presente:", !!json.qrCodePix);
-        console.log("📋 [FRONTEND] PIX Copy&Paste presente:", !!json.copyPastePix);
 
         const pixData: PixData = {
           id: json.paymentId,
@@ -414,7 +432,6 @@ export function useSimpleCheckout() {
           throw new Error("Dados PIX incompletos retornados pelo servidor. Tente novamente ou entre em contato com o suporte.")
         }
 
-        console.log("✅ PIX data from backend is valid, using it")
         setPaymentData(pixData)
         return pixData
 

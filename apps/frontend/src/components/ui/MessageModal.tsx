@@ -25,40 +25,43 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   } = useChatStorage();
 
   const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Filtrar sessões baseado na busca
   useEffect(() => {
-    if (isOpen && isAuthenticated) {
-      let isMounted = true;
-      const fetchConversations = async () => {
-        try {
-          const conversations = await authChat.fetchConversations();
-          if (isMounted) {
-            const filtered = conversations.map((conversation: AuthChatConversation) => ({
-              id: conversation.id,
-              title: `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
-              messages: [],
-              flow: 'free' as ChatSession['flow'], // Explicitly cast to match ChatSession type
-              createdAt: new Date(conversation.created_at),
-              updatedAt: new Date(conversation.updated_at),
-            })).filter((conversation: { title: string }) =>
-              conversation.title.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            setFilteredSessions(filtered);
+    if (isOpen) {
+      if (isAuthenticated) {
+        let isMounted = true;
+        const fetchConversations = async () => {
+          try {
+            const conversations = await authChat.fetchConversations();
+            if (isMounted) {
+              const filtered = conversations.map((conversation: AuthChatConversation) => ({
+                id: conversation.id,
+                title: `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
+                messages: [],
+                flow: 'free' as ChatSession['flow'], // Explicitly cast to match ChatSession type
+                createdAt: new Date(conversation.created_at),
+                updatedAt: new Date(conversation.updated_at),
+              })).filter((conversation: { title: string }) =>
+                conversation.title.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+              setFilteredSessions(filtered);
+            }
+          } catch (error) {
+            console.error('Erro ao buscar conversas:', error);
           }
-        } catch (error) {
-          console.error('Erro ao buscar conversas:', error);
-        }
-      };
-      fetchConversations();
-      return () => {
-        isMounted = false;
-      };
-    } else if (!isAuthenticated) {
-      const filtered = searchLocalSessions(searchQuery);
-      setFilteredSessions(filtered);
+        };
+        fetchConversations();
+        return () => {
+          isMounted = false;
+        };
+      } else {
+        const filtered = searchLocalSessions(searchQuery);
+        setFilteredSessions(filtered);
+      }
     }
-  }, [isOpen, isAuthenticated, searchQuery, searchLocalSessions]);
+  }, [isOpen, isAuthenticated, searchQuery, authChat, searchLocalSessions, refreshTrigger, localSessions]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -73,11 +76,22 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
     }
   };
 
-  const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (confirm('Tem certeza que deseja excluir esta conversa?')) {
       if (isAuthenticated) {
-        console.warn('deleteConversation is not implemented in useAuthenticatedChatStorage');
+        try {
+          const success = await authChat.deleteConversation(sessionId);
+          if (success) {
+            // Forçar refresh das conversas
+            setRefreshTrigger(prev => prev + 1);
+          } else {
+            alert('Erro ao excluir a conversa. Tente novamente.');
+          }
+        } catch (error) {
+          console.error('Erro ao excluir conversa:', error);
+          alert('Erro ao excluir a conversa. Tente novamente.');
+        }
       } else {
         deleteLocalSession(sessionId);
       }
@@ -92,7 +106,8 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
           for (const conversation of conversations) {
             await authChat.deleteConversation(conversation.id);
           }
-          setFilteredSessions([]); // Atualiza a UI após limpar as conversas
+          // Forçar refresh das conversas
+          setRefreshTrigger(prev => prev + 1);
         } catch (error) {
           console.error('Erro ao limpar conversas do banco de dados:', error);
         }
@@ -143,7 +158,7 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Conversas Salvas</h2>
-          {localSessions.length > 0 && (
+          {(localSessions.length > 0 || (isAuthenticated && filteredSessions.length > 0)) && (
             <button
               onClick={clearAllSessions}
               className="text-red-500 hover:text-red-700 text-sm transition-colors"

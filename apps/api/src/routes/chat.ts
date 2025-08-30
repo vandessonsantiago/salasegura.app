@@ -5,10 +5,22 @@ import { authenticateToken } from '../middleware/auth';
 
 const router: Router = express.Router();
 
-// Inicializar OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Inicializar OpenAI com validação
+let openai: OpenAI | null = null;
+
+try {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (apiKey && apiKey.length > 20 && apiKey.startsWith('sk-')) {
+    openai = new OpenAI({
+      apiKey: apiKey,
+    });
+    console.log('✅ OpenAI inicializado com sucesso');
+  } else {
+    console.warn('⚠️ Chave da API OpenAI não configurada ou inválida');
+  }
+} catch (error) {
+  console.error('❌ Erro ao inicializar OpenAI:', error);
+}
 
 interface ChatMessage {
   id: string;
@@ -235,6 +247,10 @@ router.post('/', async (req, res) => {
       chatHistoryLength: chatHistory.length,
     });
 
+    // Declarar variável finalResponse
+    let finalResponse: string;
+    let completion: any = null;
+
     // Verificar se a chave da API está configurada
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('Chave da API OpenAI não configurada');
@@ -281,19 +297,37 @@ router.post('/', async (req, res) => {
 
     console.log('🤖 Chamando OpenAI com prompt:', openAIPrompt);
 
-    // Chamar API da OpenAI com o prompt ajustado
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'system', content: openAIPrompt }],
-      max_tokens: 400,
-      temperature: 0.6,
-    });
+    // Verificar se OpenAI está disponível
+    if (!openai) {
+      console.warn('⚠️ OpenAI não disponível, usando resposta de fallback');
+      finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. Como posso ajudar com sua questão jurídica hoje?';
+    } else {
+      try {
+        // Chamar API da OpenAI com o prompt ajustado
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'system', content: openAIPrompt }],
+          max_tokens: 400,
+          temperature: 0.6,
+        });
 
-    let finalResponse =
-      completion.choices[0]?.message?.content ||
-      'Desculpe, não consegui processar sua mensagem.';
+        finalResponse =
+          completion.choices[0]?.message?.content ||
+          'Desculpe, não consegui processar sua mensagem.';
 
-    console.log('✅ Resposta da OpenAI:', finalResponse.substring(0, 100) + '...');
+        console.log('✅ Resposta da OpenAI:', finalResponse.substring(0, 100) + '...');
+      } catch (error: any) {
+        console.error('❌ Erro na API OpenAI:', error.message);
+
+        // Tratamento específico para erro de API key
+        if (error.status === 401 || error.code === 'invalid_api_key') {
+          console.error('🔑 Chave da API OpenAI inválida ou expirada');
+          finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. No momento, estou com uma dificuldade técnica, mas posso ajudar com questões básicas sobre divórcio, guarda de filhos e pensão alimentícia. Que dúvida você tem?';
+        } else {
+          finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. Como posso ajudar com sua questão jurídica hoje?';
+        }
+      }
+    }
 
     // Adicionando lógica para identificar mensagens que precisam de respostas jurídicas
     const isLegalContext = (message: string): boolean => {
@@ -315,16 +349,21 @@ router.post('/', async (req, res) => {
         finalResponse = `Entendemos que este é um momento importante para você. Para ajudar, criamos um espaço digital chamado Sala Segura, onde você pode organizar e simplificar processos relacionados à sua situação. Por favor, preencha o formulário que aparecerá em seguida para que possamos oferecer o suporte necessário.`;
       } else {
         console.log('🔄 Mensagem genérica - chamando OpenAI para resposta ajustada');
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'system', content: `Você é um assistente especializado em guiar usuários para conversões. Responda de forma acolhedora e incentive o preenchimento do formulário. Mensagem do usuário: "${message}"` }],
-          max_tokens: 400,
-          temperature: 0.6,
-        });
+        if (!openai) {
+          console.warn('⚠️ OpenAI não disponível, usando resposta de fallback');
+          finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. Como posso ajudar com sua questão jurídica hoje?';
+        } else {
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'system', content: `Você é um assistente especializado em guiar usuários para conversões. Responda de forma acolhedora e incentive o preenchimento do formulário. Mensagem do usuário: "${message}"` }],
+            max_tokens: 400,
+            temperature: 0.6,
+          });
 
-        finalResponse =
-          completion.choices[0]?.message?.content ||
-          'Desculpe, não consegui processar sua mensagem.';
+          finalResponse =
+            completion.choices[0]?.message?.content ||
+            'Desculpe, não consegui processar sua mensagem.';
+        }
       }
     } else if (isAuthenticatedRequest) {
       console.log('🔒 Requisição autenticada - verificando contexto da mensagem');
@@ -390,7 +429,7 @@ router.post('/', async (req, res) => {
 
     const responseData = {
       response: finalResponse,
-      usage: completion.usage,
+      usage: completion?.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
       conversionData: shouldConvert.shouldConvert
         ? {
             shouldConvert: true,
@@ -403,7 +442,7 @@ router.post('/', async (req, res) => {
     console.log('📤 Enviando resposta:', {
       responseLength: finalResponse.length,
       shouldConvert: shouldConvert.shouldConvert,
-      usage: completion.usage,
+      usage: completion?.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
     });
 
     res.json(responseData);

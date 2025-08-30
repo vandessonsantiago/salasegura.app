@@ -225,7 +225,7 @@ export class AgendamentoService {
           qr_code_pix: paymentData.qrCodePix,
           copy_paste_pix: paymentData.copyPastePix,
           pix_expires_at: paymentData.pixExpiresAt,
-          status: paymentData.paymentStatus === 'CONFIRMED' ? 'confirmed' : 'pending_payment',
+          status: ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'].includes(paymentData.paymentStatus) ? 'confirmed' : 'pending_payment',
           updated_at: new Date().toISOString(),
         })
         .eq('id', agendamentoId);

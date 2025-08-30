@@ -103,7 +103,9 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Se houver agendamento_id, atualizar status do agendamento
     if (agendamentoId) {
-      const agendamentoStatus = payment.status === 'RECEIVED' || payment.status === 'CONFIRMED'
+      // Reconhecer todos os status válidos do Asaas que indicam pagamento concluído
+      const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'];
+      const agendamentoStatus = completedStatuses.includes(payment.status)
         ? 'CONFIRMED'
         : payment.status;
 

@@ -27,6 +27,8 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   // Filtrar sessões baseado na busca
   useEffect(() => {
@@ -196,6 +198,7 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
     if (confirm('Tem certeza que deseja excluir esta conversa?')) {
       if (isAuthenticated) {
         try {
+          setDeletingConversationId(sessionId);
           const success = await authChat.deleteConversation(sessionId);
           if (success) {
             // Forçar refresh das conversas
@@ -206,6 +209,8 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
         } catch (error) {
           console.error('Erro ao excluir conversa:', error);
           alert('Erro ao excluir a conversa. Tente novamente.');
+        } finally {
+          setDeletingConversationId(null);
         }
       } else {
         deleteLocalSession(sessionId);
@@ -217,6 +222,7 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
     if (confirm('Tem certeza que deseja limpar todas as conversas?')) {
       if (isAuthenticated) {
         try {
+          setIsClearingAll(true);
           const conversations = await authChat.fetchConversations();
           for (const conversation of conversations) {
             await authChat.deleteConversation(conversation.id);
@@ -225,6 +231,8 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
           setRefreshTrigger(prev => prev + 1);
         } catch (error) {
           console.error('Erro ao limpar conversas do banco de dados:', error);
+        } finally {
+          setIsClearingAll(false);
         }
       } else {
         clearAllLocalSessions();
@@ -276,9 +284,20 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
           {(localSessions.length > 0 || (isAuthenticated && filteredSessions.length > 0)) && (
             <button
               onClick={clearAllSessions}
-              className="text-red-500 hover:text-red-700 text-sm transition-colors"
+              disabled={isClearingAll}
+              className="text-red-500 hover:text-red-700 text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              Limpar Tudo
+              {isClearingAll ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Limpando...
+                </>
+              ) : (
+                'Limpar Tudo'
+              )}
             </button>
           )}
         </div>
@@ -308,11 +327,19 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
                     </h3>
                     <button
                       onClick={(e) => handleDeleteSession(e, session.id)}
-                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                      disabled={deletingConversationId === session.id}
+                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity disabled:opacity-50"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      {deletingConversationId === session.id ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
                     </button>
                   </div>
                   <p className="text-gray-600 text-xs mb-2">

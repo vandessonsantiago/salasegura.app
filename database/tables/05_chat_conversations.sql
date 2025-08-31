@@ -23,6 +23,7 @@ ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own chat conversations" ON chat_conversations FOR SELECT USING (auth.uid()::text = user_id);
 CREATE POLICY "Users can insert their own chat conversations" ON chat_conversations FOR INSERT WITH CHECK (auth.uid()::text = user_id);
 CREATE POLICY "Users can update their own chat conversations" ON chat_conversations FOR UPDATE USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete their own chat conversations" ON chat_conversations FOR DELETE USING (auth.uid()::text = user_id);
 
 -- Trigger for updated_at
 CREATE TRIGGER update_chat_conversations_updated_at BEFORE UPDATE ON chat_conversations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -26,6 +26,9 @@ CREATE POLICY "Users can view their own chat messages" ON chat_messages FOR SELE
 CREATE POLICY "Users can insert their own chat messages" ON chat_messages FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM chat_conversations WHERE id = conversation_id AND user_id = auth.uid()::text)
 );
+CREATE POLICY "Users can delete their own chat messages" ON chat_messages FOR DELETE USING (
+  EXISTS (SELECT 1 FROM chat_conversations WHERE id = conversation_id AND user_id = auth.uid()::text)
+);
 
 -- Trigger for updated_at
 CREATE TRIGGER update_chat_messages_updated_at BEFORE UPDATE ON chat_messages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

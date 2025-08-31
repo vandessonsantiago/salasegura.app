@@ -134,7 +134,10 @@ export class ChatController {
 		const userId = req.user?.id;
 		const conversationId = req.params.id;
 
+		console.log('🗑️ [DELETE] Iniciando deleção de conversa:', { conversationId, userId });
+
 		if (!userId) {
+			console.log('❌ [DELETE] Usuário não autenticado');
 			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
 		}
 
@@ -146,9 +149,17 @@ export class ChatController {
 			.eq('user_id', userId)
 			.single();
 
-		if (convErr || !conv) {
+		if (convErr) {
+			console.log('❌ [DELETE] Erro ao buscar conversa:', convErr);
+			return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+		}
+
+		if (!conv) {
+			console.log('❌ [DELETE] Conversa não encontrada ou não pertence ao usuário');
 			return res.status(404).json({ success: false, error: 'Conversa não encontrada' });
 		}
+
+		console.log('✅ [DELETE] Conversa encontrada, iniciando deleção');
 
 		// Deleta a conversa
 		const { error: deleteErr } = await supabase
@@ -157,9 +168,11 @@ export class ChatController {
 			.eq('id', conversationId);
 
 		if (deleteErr) {
+			console.log('❌ [DELETE] Erro ao deletar conversa:', deleteErr);
 			return res.status(500).json({ success: false, error: deleteErr.message });
 		}
 
+		console.log('✅ [DELETE] Conversa deletada com sucesso');
 		return res.json({ success: true, message: 'Conversa deletada com sucesso' });
 	}
 }

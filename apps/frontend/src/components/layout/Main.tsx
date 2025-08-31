@@ -54,31 +54,51 @@ const Main = forwardRef<MainRef, MainProps>(({
   }, [isLoadingSession]);
 
   const handleChatStart = (started: boolean) => {
-    console.log('🔔 Main.handleChatStart chamado:', { started, currentChatStarted: chatStarted });
+    console.log('🔔 [DEBUG] Main.handleChatStart chamado:', {
+      started,
+      currentChatStarted: chatStarted,
+      currentChatReset: chatReset,
+      isLoadingSession,
+      hasOnNewMessage: !!onNewMessage
+    });
     setChatStarted(started);
     // Quando o chat inicia, resetar o estado de reset (apenas se não for uma sessão sendo carregada)
     if (started && !chatReset) {
       setChatReset(false);
     }
-    console.log('✅ Main.handleChatStart: chatStarted definido como', started);
+    console.log('✅ [DEBUG] Main.handleChatStart: chatStarted definido como', started, '- chatReset definido como', started && !chatReset ? false : chatReset);
     if (onNewMessage) {
       onNewMessage(started ? 'Chat iniciado' : '');
     }
   };
 
   const handleChatReset = (reset: boolean) => {
-    console.log('🔄 Main.handleChatReset chamado:', { reset, currentChatReset: chatReset });
+    console.log('🔄 [DEBUG] Main.handleChatReset chamado:', {
+      reset,
+      currentChatReset: chatReset,
+      currentChatStarted: chatStarted,
+      isLoadingSession
+    });
     setChatReset(reset);
-    console.log('✅ Main.handleChatReset: chatReset definido como', reset);
+    console.log('✅ [DEBUG] Main.handleChatReset: chatReset definido como', reset, '- chatStarted permanece', chatStarted);
     if (onChatReset) {
       onChatReset(reset);
     }
   };
 
   const resetChat = () => {
+    console.log('🔄 [DEBUG] Main.resetChat chamado - estado atual:', {
+      chatStarted,
+      chatReset,
+      isLoadingSession,
+      hasChatContainerRef: !!chatContainerRef.current
+    });
     if (chatContainerRef.current) {
       chatContainerRef.current.resetChat();
       setChatStarted(false);
+      console.log('✅ [DEBUG] Main.resetChat: chatContainerRef.current.resetChat() chamado e chatStarted definido como false');
+    } else {
+      console.log('❌ [DEBUG] Main.resetChat: chatContainerRef.current é null');
     }
   };
 
@@ -135,19 +155,17 @@ const Main = forwardRef<MainRef, MainProps>(({
           </div>
         )}
 
-        {/* ChatContainer - mostrar sempre que chatStarted, chatReset ou isLoadingSession for true */}
-                {(chatStarted || chatReset || isLoadingSession) && (
-          <div className="w-full">
-            <ChatContainer
-              ref={chatContainerRef}
-              onChatStart={handleChatStart}
-              onChatReset={handleChatReset}
-              chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
-              triggerMessage={triggerMessage}
-              loadSession={loadSession}
-            />
-          </div>
-        )}
+        {/* ChatContainer - mostrar sempre para processar triggerMessage */}
+        <div className="w-full">
+          <ChatContainer
+            ref={chatContainerRef}
+            onChatStart={handleChatStart}
+            onChatReset={handleChatReset}
+            chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
+            triggerMessage={triggerMessage}
+            loadSession={loadSession}
+          />
+        </div>
       </div>
     </main>
   );

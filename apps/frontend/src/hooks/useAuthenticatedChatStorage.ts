@@ -38,7 +38,8 @@ export function useAuthenticatedChatStorage(token: string) {
       try {
         const data = JSON.parse(text);
         console.log('useAuthenticatedChatStorage.fetchConversations: parsed response', data);
-        setConversations(data.data || []);
+        // Não atualizar o estado local para evitar re-renders desnecessários
+        // setConversations(data.data || []);
         return data.data || [];
       } catch (e) {
         // Non-JSON response (HTML/401) - return empty
@@ -110,7 +111,8 @@ export function useAuthenticatedChatStorage(token: string) {
             content: data.data[0].content?.substring(0, 50)
           } : null
         });
-        setMessages(data.data || []);
+        // Não atualizar o estado local para evitar re-renders desnecessários
+        // setMessages(data.data || []);
         return data.data || [];
       } catch (e) {
         console.warn('useAuthenticatedChatStorage.fetchMessages: non-json response', { snippet: body.substring(0, 500) });

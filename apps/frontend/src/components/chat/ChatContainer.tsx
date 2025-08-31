@@ -78,7 +78,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   const savingMessageRef = useRef(false);
   
   useEffect(() => {
-    console.log('🔍 ChatContainer useEffect triggerMessage:', { triggerMessage, isChatStarted, isProcessing: processingMessageRef.current, conversationCreated: conversationCreatedRef.current });
+    console.log('🔍 ChatContainer useEffect triggerMessage:', { 
+      triggerMessage, 
+      isChatStarted, 
+      isProcessing: processingMessageRef.current, 
+      conversationCreated: conversationCreatedRef.current,
+      isActive,
+      isChatReset
+    });
     
     if (triggerMessage && triggerMessage !== lastTriggerRef.current && !isLoadingSessionRef.current && !processingMessageRef.current) {
       console.log('✅ Processando triggerMessage:', triggerMessage);
@@ -105,10 +112,12 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
         isNew: triggerMessage !== lastTriggerRef.current, 
         isLoading: isLoadingSessionRef.current,
         isProcessing: processingMessageRef.current,
-        conversationCreated: conversationCreatedRef.current
+        conversationCreated: conversationCreatedRef.current,
+        isActive,
+        isChatReset
       });
     }
-  }, [triggerMessage]);
+  }, [triggerMessage, isChatStarted, isActive, isChatReset]);
 
   // Handle typing completion
   const handleTypingComplete = async () => {
@@ -255,7 +264,15 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Iniciar chat (primeira mensagem)
   const handleStartChat = async (firstMessage: string) => {
-    console.log('🚀 handleStartChat iniciado:', { firstMessage, isAuthenticated, hasAuthChat: !!authChat, conversationCreated: conversationCreatedRef.current });
+    console.log('🚀 handleStartChat INÍCIO:', { 
+      firstMessage, 
+      isAuthenticated, 
+      hasAuthChat: !!authChat, 
+      conversationCreated: conversationCreatedRef.current,
+      isChatStarted,
+      isActive,
+      isChatReset
+    });
     
     // Prevent multiple conversation creation
     if (conversationCreatedRef.current) {
@@ -266,6 +283,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     // Resetar flag de reset quando iniciar nova conversa
     setIsChatReset(false);
     
+    console.log('🔄 Definindo isChatStarted = true');
     setIsChatStarted(true);
     conversationCreatedRef.current = true;
 
@@ -478,36 +496,57 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Reiniciar chat (interface apenas, preserva conversa no banco)
   const handleRestartChat = () => {
+    console.log('🔄 [DEBUG] handleRestartChat chamado - estado atual:', {
+      isChatStarted,
+      isChatReset,
+      chatMessagesLength: chatMessages.length,
+      currentSessionId,
+      conversationCreated: conversationCreatedRef.current
+    });
     console.log('🔄 Reiniciando chat (interface) - permitindo nova conversa');
-    
+
     // Resetar apenas o estado da interface, mantendo a conversa salva
     setIsChatStarted(false);
     setChatMessages([]);
     setIsThinking(false);
     setIsTyping(false);
     setPendingMessage(null);
-    
+
     // Resetar currentSessionId para permitir nova conversa
     setCurrentSessionId(null);
-    
+
     // Resetar flag para permitir criação de nova conversa
     conversationCreatedRef.current = false;
-    
+
     // Resetar flags de controle
     processingMessageRef.current = false;
     lastTriggerRef.current = '';
     savingMessageRef.current = false;
-    
+
     // Marcar que o chat foi resetado
     setIsChatReset(true);
-    
-    // Notificar parent sobre o reset
+
+    // Resetar o triggerMessage para evitar reprocessamento
     if (onChatReset) {
       onChatReset(true);
     }
-    
+
     console.log('✅ Chat reiniciado - pronto para nova conversa');
+    console.log('✅ [DEBUG] Chat reiniciado - novo estado:', {
+      isChatStarted: false,
+      isChatReset: true,
+      chatMessagesLength: 0,
+      currentSessionId: null,
+      conversationCreated: false
+    });
   };  const resetChat = () => {
+    console.log('🔄 [DEBUG] ChatContainer.resetChat chamado - estado atual:', {
+      isChatStarted,
+      isChatReset,
+      chatMessagesLength: chatMessages.length,
+      currentSessionId,
+      conversationCreated: conversationCreatedRef.current
+    });
     console.log('🔄 Resetando chat (interface) - permitindo nova conversa');
     
     // Mesmo comportamento do handleRestartChat
@@ -537,6 +576,13 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     }
     
     console.log('✅ Chat resetado - pronto para nova conversa');
+    console.log('✅ [DEBUG] ChatContainer.resetChat finalizado - novo estado:', {
+      isChatStarted: false,
+      isChatReset: true,
+      chatMessagesLength: 0,
+      currentSessionId: null,
+      conversationCreated: false
+    });
   };
 
   const loadSession = (session: ChatSession) => {
@@ -630,7 +676,15 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   );
 
   if (!isChatStarted || !isActive) {
-    console.log('❌ Chat não iniciado ou não ativo, exibindo div vazio', { isChatStarted, isActive, isChatReset });
+    console.log('❌ [DEBUG] ChatContainer: renderizando estado não iniciado', {
+      isChatStarted,
+      isActive,
+      isChatReset,
+      triggerMessage: !!triggerMessage,
+      chatMessagesLength: chatMessages.length,
+      currentSessionId,
+      conversationCreated: conversationCreatedRef.current
+    });
 
     // Se o chat foi resetado, mostrar o indicador visual em vez de div vazia
     if (isChatReset) {
@@ -667,19 +721,28 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       );
     }
 
-    // Estado inicial - Vazio
+    // Estado inicial - Espaço vazio mas funcional para processar triggerMessage
     return (
       <div className="flex-1">
         {/* Espaço vazio - aguardando primeira mensagem */}
+        {/* Debug info para desenvolvimento */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-400 p-2">
+            ChatContainer aguardando triggerMessage...
+          </div>
+        )}
       </div>
     );
   }
 
-  console.log('✅ Chat iniciado, renderizando interface:', { 
+  console.log('✅ ChatContainer: renderizando estado ativo', { 
     chatMessagesLength: chatMessages.length, 
     isThinking, 
     isTyping, 
-    hasPendingMessage: !!pendingMessage 
+    hasPendingMessage: !!pendingMessage,
+    isChatStarted,
+    isActive,
+    isChatReset
   });
 
   // Estado do chat ativo - Exibir mensagens

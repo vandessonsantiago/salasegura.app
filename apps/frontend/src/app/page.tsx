@@ -23,7 +23,9 @@ export default function LandingPage() {
   const handleFooterMessage = (message: string) => {
     console.log('🔄 Página recebeu mensagem do footer:', message);
     // Usar timestamp para garantir que seja uma nova mensagem
-    setFooterMessage(`${message}|${Date.now()}`);
+    const timestampedMessage = `${message}|${Date.now()}`;
+    console.log('📤 Página definindo footerMessage:', timestampedMessage);
+    setFooterMessage(timestampedMessage);
   };
 
   // Função para resetar chat (quando clica no logo)

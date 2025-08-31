@@ -26,38 +26,48 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
 
   const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
 
   // Filtrar sessões baseado na busca
   useEffect(() => {
-    if (isOpen) {
+    console.log('🔄 [DEBUG] MessageModal useEffect executado:', {
+      isOpen,
+      isAuthenticated,
+      searchQuery,
+      refreshTrigger,
+      isLoadingConversations,
+      hasAuthChat: !!authChat
+    });
+
+    if (isOpen && !isLoadingConversations) {
       if (isAuthenticated) {
+        setIsLoadingConversations(true);
         let isMounted = true;
         const fetchConversations = async () => {
           try {
-            console.log('📡 MessageModal: Iniciando busca de conversas...');
+            console.log('📡 [DEBUG] MessageModal: Iniciando busca de conversas...');
             const conversations = await authChat.fetchConversations();
-            console.log('✅ MessageModal: Conversas encontradas:', conversations.length);
+            console.log('✅ [DEBUG] MessageModal: Conversas encontradas:', conversations.length);
             if (isMounted) {
-              // Buscar contagem de mensagens para cada conversa
+              // Buscar contagem de mensagens para cada conversa (limitando para evitar muitas requisições)
+              const maxConversations = 10; // Limitar para evitar muitas requisições
+              const limitedConversations = conversations.slice(0, maxConversations);
+
               const conversationsWithMessageCount = await Promise.allSettled(
-                conversations.map(async (conversation: AuthChatConversation) => {
+                limitedConversations.map(async (conversation: AuthChatConversation) => {
                   try {
-                    const messageCount = await authChat.fetchMessageCount(conversation.id);
+                    // Usar fetchMessages ao invés de fetchMessageCount para obter dados completos
+                    const messages = await authChat.fetchMessages(conversation.id);
                     return {
                       id: conversation.id,
                       title: conversation.title || `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
-                      messages: Array(messageCount).fill(null).map((_, index) => ({ // Criar array vazio com tamanho correto
-                        id: `temp-${index}`,
-                        type: 'user' as const,
-                        content: '',
-                        timestamp: new Date()
-                      })),
+                      messages: messages || [],
                       flow: 'free' as ChatSession['flow'],
                       createdAt: new Date(conversation.created_at),
                       updatedAt: new Date(conversation.updated_at),
                     };
                   } catch (error) {
-                    console.error(`Erro ao buscar contagem de mensagens da conversa ${conversation.id}:`, error);
+                    console.error(`Erro ao buscar mensagens da conversa ${conversation.id}:`, error);
                     // Fallback: retornar conversa sem mensagens
                     return {
                       id: conversation.id,
@@ -83,18 +93,23 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
             }
           } catch (error) {
             console.error('Erro ao buscar conversas:', error);
+          } finally {
+            if (isMounted) {
+              setIsLoadingConversations(false);
+            }
           }
         };
         fetchConversations();
         return () => {
           isMounted = false;
+          setIsLoadingConversations(false);
         };
       } else {
         const filtered = searchLocalSessions(searchQuery);
         setFilteredSessions(filtered);
       }
     }
-  }, [isOpen, isAuthenticated, searchQuery, authChat, searchLocalSessions, refreshTrigger, localSessions]);
+  }, [isOpen, isAuthenticated, searchQuery, refreshTrigger]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {

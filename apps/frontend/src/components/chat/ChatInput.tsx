@@ -19,9 +19,14 @@ export default function ChatInput({
     const formData = new FormData(e.currentTarget);
     const message = formData.get('message') as string;
     
+    console.log('📝 ChatInput.handleSubmit:', { message, hasOnSendMessage: !!onSendMessage });
+    
     if (message.trim() && onSendMessage) {
+      console.log('📤 ChatInput chamando onSendMessage...');
       onSendMessage(message);
       e.currentTarget.reset();
+    } else {
+      console.log('❌ ChatInput: mensagem vazia ou onSendMessage não definido');
     }
   };
 

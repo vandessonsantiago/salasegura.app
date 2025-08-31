@@ -14,9 +14,12 @@ export default function Footer({
   className = ""
 }: FooterProps) {
   const handleSendMessage = (message: string) => {
-    console.log('📤 Footer enviando:', message);
+    console.log('📤 Footer.handleSendMessage chamado:', message);
     if (onSendMessage) {
+      console.log('📤 Footer chamando onSendMessage...');
       onSendMessage(message);
+    } else {
+      console.log('❌ Footer: onSendMessage não definido');
     }
   };
 

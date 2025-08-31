@@ -299,18 +299,9 @@ router.post('/', async (req, res) => {
             }
           }
 
-          // Salvar mensagem do usuário
-          if (currentConversationId) {
-            await supabase
-              .from('chat_messages')
-              .insert({
-                conversation_id: currentConversationId,
-                role: 'user',
-                content: message
-              });
-
-            console.log('� Mensagem do usuário salva no banco');
-          }
+          // Remover salvamento automático da mensagem do usuário
+          // O ChatContainer cuidará disso para evitar duplicação
+          console.log('� Mensagem do usuário será salva pelo ChatContainer no frontend');
         }
       } catch (authError) {
         console.error('❌ Erro na autenticação:', authError);

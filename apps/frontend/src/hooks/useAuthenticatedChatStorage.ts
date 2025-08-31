@@ -4,6 +4,7 @@ import { apiEndpoint } from '@/lib/api';
 export interface AuthChatConversation {
   id: string;
   user_id: string;
+  title?: string;
   created_at: string;
   updated_at: string;
 }
@@ -11,7 +12,7 @@ export interface AuthChatConversation {
 export interface AuthChatMessage {
   id: string;
   conversation_id: string;
-  sender: string;
+  role: string;
   content: string;
   created_at: string;
 }
@@ -51,13 +52,17 @@ export function useAuthenticatedChatStorage(token: string) {
   }, [token]);
 
   // Criar nova conversa
-  const createConversation = useCallback(async () => {
+  const createConversation = useCallback(async (title?: string) => {
     try {
       const url = apiEndpoint('/chat/conversations');
       console.log('useAuthenticatedChatStorage.createConversation calling URL:', url);
       const res = await fetch(url, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title })
       });
       const status = res.status;
       const body = await res.text();
@@ -95,7 +100,16 @@ export function useAuthenticatedChatStorage(token: string) {
       }
       try {
         const data = JSON.parse(body);
-        console.log('useAuthenticatedChatStorage.fetchMessages: parsed', { conversationId, length: (data.data || []).length });
+        console.log('useAuthenticatedChatStorage.fetchMessages: parsed', { 
+          conversationId, 
+          length: (data.data || []).length,
+          rawData: data,
+          firstItem: data.data?.[0] ? {
+            id: data.data[0].id,
+            role: data.data[0].role,
+            content: data.data[0].content?.substring(0, 50)
+          } : null
+        });
         setMessages(data.data || []);
         return data.data || [];
       } catch (e) {
@@ -113,6 +127,8 @@ export function useAuthenticatedChatStorage(token: string) {
     try {
       const url = apiEndpoint(`/chat/conversations/${conversationId}/messages`);
       console.log('useAuthenticatedChatStorage.addMessage calling URL:', url);
+      console.log('useAuthenticatedChatStorage.addMessage sending:', { conversationId, sender, content: content.substring(0, 50) });
+      
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -129,7 +145,12 @@ export function useAuthenticatedChatStorage(token: string) {
       }
       try {
         const data = JSON.parse(body);
-        console.log('useAuthenticatedChatStorage.addMessage: parsed', data);
+        console.log('useAuthenticatedChatStorage.addMessage: parsed', {
+          data,
+          dataData: data.data,
+          dataDataRole: data.data?.role,
+          dataDataContent: data.data?.content?.substring(0, 50)
+        });
         return data.data;
       } catch (e) {
         console.warn('useAuthenticatedChatStorage.addMessage: non-json response', { snippet: body.substring(0, 800) });

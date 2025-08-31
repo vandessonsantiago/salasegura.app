@@ -38,7 +38,7 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
             if (isMounted) {
               const filtered = conversations.map((conversation: AuthChatConversation) => ({
                 id: conversation.id,
-                title: `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
+                title: conversation.title || `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
                 messages: [],
                 flow: 'free' as ChatSession['flow'], // Explicitly cast to match ChatSession type
                 createdAt: new Date(conversation.created_at),
@@ -69,10 +69,36 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
     }
   };
 
-  const handleLoadSession = (session: ChatSession) => {
-    if (onLoadSession) {
-      onLoadSession(session);
-      onClose();
+  const handleLoadSession = async (session: ChatSession) => {
+    console.log('Loading session from modal:', session.id);
+    if (isAuthenticated && session.id) {
+      try {
+        const messages = await authChat.fetchMessages(session.id);
+        const loadedSession: ChatSession = {
+          ...session,
+          messages: messages.map((msg: any) => ({
+            id: msg.id,
+            type: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content,
+            timestamp: new Date(msg.created_at)
+          }))
+        };
+        if (onLoadSession) {
+          onLoadSession(loadedSession);
+          onClose();
+        }
+      } catch (error) {
+        console.error('Error loading session messages:', error);
+        if (onLoadSession) {
+          onLoadSession(session);
+          onClose();
+        }
+      }
+    } else {
+      if (onLoadSession) {
+        onLoadSession(session);
+        onClose();
+      }
     }
   };
 

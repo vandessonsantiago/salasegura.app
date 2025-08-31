@@ -38,7 +38,7 @@ export default function LandingPage() {
 
   // Função para carregar sessão do modal
   const handleLoadSession = (session: ChatSession) => {
-    console.log('🔄 Carregando sessão:', session);
+    console.log('Loading session from modal:', session.id);
     if (mainRef.current) {
       mainRef.current.loadSession(session);
     }

@@ -305,7 +305,7 @@ router.post('/', async (req, res) => {
               .from('chat_messages')
               .insert({
                 conversation_id: currentConversationId,
-                role: 'user',
+                sender: 'user',
                 content: message
               });
 
@@ -507,7 +507,7 @@ router.post('/', async (req, res) => {
           .from('chat_messages')
           .insert({
             conversation_id: currentConversationId,
-            role: 'assistant',
+            sender: 'assistant',
             content: finalResponse
           });
 

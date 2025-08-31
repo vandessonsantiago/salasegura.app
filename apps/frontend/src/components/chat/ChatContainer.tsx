@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { useChatStorage, ChatMessage, ChatSession } from '@/hooks/useChatStorage';
+import { ChatMessage, ChatSession, useChatStorage } from '@/hooks/useChatStorage';
 import { useAuthenticatedChatStorage } from '@/hooks/useAuthenticatedChatStorage';
 import { ChatService } from '@/services/chatService';
 import { MessageBlock, TypingAnimation, ThinkingAnimation } from '@/components/ui';
@@ -11,6 +11,7 @@ interface ChatContainerProps {
   onChatStart?: (started: boolean) => void;
   chatType?: 'juridico' | 'conversao';
   triggerMessage?: string; // Nova prop para disparar mensagens
+  isActive?: boolean; // Nova prop para controlar se o chat está ativo
 }
 
 export interface ChatContainerRef {
@@ -20,7 +21,7 @@ export interface ChatContainerRef {
   startChat: (message: string) => void;
 }
 
-const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, triggerMessage, chatType = 'conversao' }, ref) => {
+const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, triggerMessage, chatType = 'conversao', isActive = true }, ref) => {
   const [isChatStarted, setIsChatStarted] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
@@ -28,6 +29,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   const [pendingMessage, setPendingMessage] = useState<ChatMessage | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Log quando o componente é montado
+  useEffect(() => {
+    console.log('🎯 ChatContainer montado');
+    return () => {
+      console.log('💀 ChatContainer desmontado');
+    };
+  }, []);
 
   const { createSession, updateSession } = useChatStorage();
   const { user, session } = useAuth();
@@ -51,64 +60,69 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     scrollToBottom();
   }, [chatMessages, isThinking, isTyping]);
 
-  // Notificar componente pai sobre mudança de estado
+  // Notify parent about chat state changes
   useEffect(() => {
-    console.log('🔔 useEffect isChatStarted mudou:', isChatStarted);
-    if (onChatStart) {
+    if (!isLoadingSessionRef.current && onChatStart) {
       onChatStart(isChatStarted);
     }
   }, [isChatStarted, onChatStart]);
 
-  // Controle simples: quando triggerMessage muda, processa a mensagem
+  // Handle triggerMessage
   const lastTriggerRef = useRef<string>('');
+  const isLoadingSessionRef = useRef(false);
   useEffect(() => {
-    if (triggerMessage && triggerMessage !== lastTriggerRef.current) {
+    if (triggerMessage && triggerMessage !== lastTriggerRef.current && !isLoadingSessionRef.current) {
       lastTriggerRef.current = triggerMessage;
       const cleanMessage = triggerMessage.includes('|') ? triggerMessage.split('|')[0] : triggerMessage;
       
-      console.log('🎯 Nova triggerMessage:', { triggerMessage, cleanMessage, isChatStarted });
-      
       if (!isChatStarted) {
-        console.log('🚀 Iniciando chat com:', cleanMessage);
         handleStartChat(cleanMessage);
       } else {
-        console.log('💬 Enviando nova mensagem:', cleanMessage);
         handleNewMessage(cleanMessage);
       }
     }
   }, [triggerMessage]);
 
-  // Função para lidar com o término da animação de digitação
+  // Handle typing completion
   const handleTypingComplete = async () => {
-    console.log('🎬 handleTypingComplete chamado');
-    console.log('📝 pendingMessage:', pendingMessage);
+    console.log('🔄 handleTypingComplete called', {
+      hasPendingMessage: !!pendingMessage,
+      pendingMessageId: pendingMessage?.id,
+      currentSessionId,
+      isAuthenticated,
+      hasAuthChat: !!authChat,
+      timestamp: new Date().toISOString()
+    });
+
     if (pendingMessage) {
+      console.log('💾 Saving assistant message to DB:', {
+        conversationId: currentSessionId,
+        type: pendingMessage.type,
+        contentLength: pendingMessage.content.length,
+        contentPreview: pendingMessage.content.substring(0, 100)
+      });
+
       const updatedMessages = [...chatMessages, pendingMessage];
-      // Atualiza UI imediatamente
       setChatMessages(updatedMessages);
       setPendingMessage(null);
       setIsTyping(false);
 
-      if (isAuthenticated && authChat && currentSessionId) {
-        // Persistir no backend e usar retorno atualizado
+      // Only persist if we have a session and the message isn't already in the loaded session
+      // AND if this message wasn't already saved by ChatService
+      if (isAuthenticated && authChat && currentSessionId && !pendingMessage.conversionData) {
         try {
-          await authChat.addMessage(currentSessionId, pendingMessage.type, pendingMessage.content);
-          const fresh = await authChat.fetchMessages(currentSessionId);
-          if (fresh && fresh.length > 0) {
-            setChatMessages(fresh.map((m: any) => ({
-              id: m.id,
-              type: m.sender === 'user' ? 'user' : 'assistant',
-              content: m.content,
-              timestamp: new Date(m.created_at)
-            })));
-          }
+          console.log('📤 Calling authChat.addMessage...');
+          const result = await authChat.addMessage(currentSessionId, pendingMessage.type, pendingMessage.content);
+          console.log('✅ Assistant message saved to DB:', result);
+          // Don't fetch messages here to avoid duplication
         } catch (err) {
-          console.error('Erro ao persistir mensagem do assistente:', err);
+          console.error('❌ Error persisting assistant message:', err);
         }
       } else if (currentSessionId) {
-        // Persistir no localStorage
         updateSession(currentSessionId, updatedMessages);
       }
+    } else {
+      console.log('⚠️ handleTypingComplete called but no pendingMessage');
     }
   };
 
@@ -160,13 +174,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
       if (isAuthenticated && authChat && currentSessionId) {
         await authChat.addMessage(currentSessionId, confirmationMessage.type, confirmationMessage.content);
-        await authChat.fetchMessages(currentSessionId);
-        setChatMessages(authChat.messages.map(m => ({
-          id: m.id,
-          type: m.sender === 'user' ? 'user' : 'assistant',
-          content: m.content,
-          timestamp: new Date(m.created_at)
-        })));
+        // Don't fetch messages here to avoid overwriting existing messages
+        // await authChat.fetchMessages(currentSessionId);
+        // setChatMessages(authChat.messages.map(m => ({
+        //   id: m.id,
+        //   type: m.role === 'user' ? 'user' : 'assistant',
+        //   content: m.content,
+        //   timestamp: new Date(m.created_at)
+        // })));
       } else if (currentSessionId) {
         updateSession(currentSessionId, updatedMessages);
       }
@@ -192,13 +207,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       setChatMessages(updatedMessages);
       if (isAuthenticated && authChat && currentSessionId) {
         await authChat.addMessage(currentSessionId, errorMessage.type, errorMessage.content);
-        await authChat.fetchMessages(currentSessionId);
-        setChatMessages(authChat.messages.map(m => ({
-          id: m.id,
-          type: m.sender === 'user' ? 'user' : 'assistant',
-          content: m.content,
-          timestamp: new Date(m.created_at)
-        })));
+        // Don't fetch messages here to avoid overwriting existing messages
+        // await authChat.fetchMessages(currentSessionId);
+        // setChatMessages(authChat.messages.map(m => ({
+        //   id: m.id,
+        //   type: m.role === 'user' ? 'user' : 'assistant',
+        //   content: m.content,
+        //   timestamp: new Date(m.created_at)
+        // })));
       } else if (currentSessionId) {
         updateSession(currentSessionId, updatedMessages);
       }
@@ -207,34 +223,46 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Iniciar chat (primeira mensagem)
   const handleStartChat = async (firstMessage: string) => {
+    console.log('🚀 handleStartChat iniciado:', { firstMessage, isAuthenticated, hasAuthChat: !!authChat });
     setIsChatStarted(true);
 
   // Create a temporary user message and show it instantly (UI-first).
   const tempUserMessage: ChatMessage = { id: Date.now().toString(), type: 'user', content: firstMessage, timestamp: new Date() };
   setChatMessages([tempUserMessage]);
+  console.log('📝 Mensagem temporária criada:', tempUserMessage);
   // show thinking while persistence / assistant generation happens
   setIsThinking(true);
 
     if (isAuthenticated && authChat) {
+      console.log('🔐 Usuário autenticado, tentando persistir...');
       // Persist conversation and message in the background. Don't block the UI.
       (async () => {
               try {
-              const conversation = await authChat.createConversation();
+              console.log('🏗️ Criando conversa...');
+              const conversation = await authChat.createConversation(`Conversa: ${firstMessage.substring(0, 30)}...`);
               console.log('📤 createConversation response:', conversation);
           if (conversation && conversation.id) {
+            console.log('✅ Conversa criada com ID:', conversation.id);
             setCurrentSessionId(conversation.id);
             try {
+                  console.log('💾 Salvando primeira mensagem...');
                   const added = await authChat.addMessage(conversation.id, 'user', firstMessage);
                   console.log('📤 addMessage response (start):', added);
+                  
                   if (added && added.id) {
-                // Replace temp message with DB record
-                setChatMessages([{ id: added.id, type: added.sender === 'user' ? 'user' : 'assistant', content: added.content, timestamp: new Date(added.created_at) }]);
+                    console.log('✅ Mensagem salva com sucesso, atualizando UI...');
+                // Replace temp message with DB record - FORCE user type for user messages
+                setChatMessages([{ id: added.id, type: 'user', content: added.content, timestamp: new Date(added.created_at) }]);
               } else {
+                console.log('❌ Falha ao salvar mensagem, tentando buscar mensagens existentes...');
                 // Fallback: fetch full messages and update if available
                     const updatedMessages = await authChat.fetchMessages(conversation.id);
                     console.log('📤 fetchMessages (start fallback) response:', updatedMessages);
                     if (updatedMessages && updatedMessages.length > 0) {
-                      setChatMessages(updatedMessages.map((m: any) => ({ id: m.id, type: m.sender === 'user' ? 'user' : 'assistant', content: m.content, timestamp: new Date(m.created_at) })));
+                      console.log('✅ Mensagens encontradas no fallback, atualizando UI...');
+                      setChatMessages(updatedMessages.map((m: any) => ({ id: m.id, type: m.role === 'user' ? 'user' : 'assistant', content: m.content, timestamp: new Date(m.created_at) })));
+                    } else {
+                      console.log('❌ Nenhuma mensagem encontrada no fallback');
                     }
               }
 
@@ -243,7 +271,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
                 const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token, conversation.id);
                     console.log('📤 ChatService.sendMessage (start) response:', assistantResp);
                     setIsThinking(false);
-                    setPendingMessage({ id: Date.now().toString() + '-assistant', type: 'assistant', content: assistantResp.response, timestamp: new Date(), conversionData: assistantResp.conversionData || undefined });
+                    setPendingMessage({ 
+                      id: Date.now().toString() + '-assistant', 
+                      type: 'assistant', 
+                      content: assistantResp.response, 
+                      timestamp: new Date(), 
+                      conversionData: assistantResp.conversionData || undefined,
+                      alreadySaved: true // Mark as already saved by ChatService
+                    });
                 setIsTyping(true);
                 // Atualizar conversationId se retornado pela API
                 if (assistantResp.conversationId && !currentSessionId) {
@@ -260,7 +295,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
                         const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token, conversation?.id);
                     console.log('📤 ChatService.sendMessage (start, on add failure) response:', assistantResp);
                     setIsThinking(false);
-                    setPendingMessage({ id: Date.now().toString() + '-assistant', type: 'assistant', content: assistantResp.response, timestamp: new Date(), conversionData: assistantResp.conversionData || undefined });
+                    setPendingMessage({ 
+                      id: Date.now().toString() + '-assistant', 
+                      type: 'assistant', 
+                      content: assistantResp.response, 
+                      timestamp: new Date(), 
+                      conversionData: assistantResp.conversionData || undefined,
+                      alreadySaved: true // Mark as already saved by ChatService
+                    });
                     setIsTyping(true);
                     // Atualizar conversationId se retornado pela API
                     if (assistantResp.conversationId && !currentSessionId) {
@@ -280,7 +322,14 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
             const assistantResp = await ChatService.sendMessage(firstMessage, [{ id: tempUserMessage.id, type: 'user', content: firstMessage, timestamp: tempUserMessage.timestamp }], session?.access_token, currentSessionId || undefined);
             console.log('📤 ChatService.sendMessage (start, on create failure) response:', assistantResp);
             setIsThinking(false);
-            setPendingMessage({ id: Date.now().toString() + '-assistant', type: 'assistant', content: assistantResp.response, timestamp: new Date(), conversionData: assistantResp.conversionData || undefined });
+            setPendingMessage({ 
+              id: Date.now().toString() + '-assistant', 
+              type: 'assistant', 
+              content: assistantResp.response, 
+              timestamp: new Date(), 
+              conversionData: assistantResp.conversionData || undefined,
+              alreadySaved: true // Mark as already saved by ChatService
+            });
             setIsTyping(true);
             // Atualizar conversationId se retornado pela API
             if (assistantResp.conversationId && !currentSessionId) {
@@ -322,12 +371,11 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       // Persiste no backend e atualiza a UI com o retorno (se houver)
       try {
         const added = await authChat.addMessage(currentSessionId, 'user', message);
-        console.log('📤 addMessage response (new):', added);
         if (added && added.id) {
-          // Substitui a mensagem temporária na lista
+          // Substitui a mensagem temporária na lista - FORCE user type for user messages
           setChatMessages(prev => prev.map(m => m.id === userMessage.id ? {
             id: added.id,
-            type: added.sender === 'user' ? 'user' : 'assistant',
+            type: 'user', // Sempre 'user' para mensagens do usuário
             content: added.content,
             timestamp: new Date(added.created_at)
           } : m));
@@ -338,7 +386,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
           if (updatedMessages && updatedMessages.length > 0) {
             setChatMessages(updatedMessages.map((m: any) => ({
               id: m.id,
-              type: m.sender === 'user' ? 'user' : 'assistant',
+              type: m.role === 'user' ? 'user' : 'assistant',
               content: m.content,
               timestamp: new Date(m.created_at)
             })));
@@ -363,7 +411,8 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
           type: 'assistant',
           content: response.response,
           timestamp: new Date(),
-          conversionData: response.conversionData || undefined
+          conversionData: response.conversionData || undefined,
+          alreadySaved: true // Mark as already saved by ChatService
         });
         setIsTyping(true);
         // Atualizar conversationId se retornado pela API
@@ -401,22 +450,39 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   };
 
   const loadSession = (session: ChatSession) => {
-    console.log('🔄 Carregando sessão:', session);
+    console.log('Loading session in ChatContainer:', session.id);
+    
+    // Prevent triggerMessage processing during session loading
+    isLoadingSessionRef.current = true;
+    
     setIsChatStarted(true);
     setChatMessages(session.messages);
     setCurrentSessionId(session.id);
     setIsThinking(false);
     setIsTyping(false);
     setPendingMessage(null);
+    
+    // Notify parent
+    if (onChatStart) {
+      onChatStart(true);
+    }
+    
+    // Release the flag after a short delay
+    setTimeout(() => {
+      isLoadingSessionRef.current = false;
+    }, 100);
   };
 
   // Expor handleNewMessage, resetChat, loadSession e startChat via ref
-  useImperativeHandle(ref, () => ({
-    handleNewMessage,
-    resetChat,
-    loadSession,
-    startChat: handleStartChat
-  }));
+  useImperativeHandle(ref, () => {
+    console.log('🔗 ChatContainer useImperativeHandle chamado');
+    return {
+      handleNewMessage,
+      resetChat,
+      loadSession,
+      startChat: handleStartChat
+    };
+  });
 
   // Adicionando validação explícita para evitar inconsistências no fluxo de autenticação e mensagens
   useEffect(() => {
@@ -427,10 +493,8 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Garantindo que o estado de início do chat seja atualizado corretamente
   useEffect(() => {
-    if (isChatStarted && chatMessages.length === 0) {
-      console.warn('Chat marcado como iniciado, mas sem mensagens. Reiniciando estado.');
-      setIsChatStarted(false);
-    }
+    // Removido: não devemos resetar o chat se não há mensagens quando carregando uma sessão
+    // Isso estava causando problemas no carregamento de sessões salvas
   }, [isChatStarted, chatMessages]);
 
   // Melhorando o fallback para mensagens pendentes
@@ -451,8 +515,8 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     </div>
   );
 
-  if (!isChatStarted) {
-    console.log('❌ Chat não iniciado, exibindo div vazio');
+  if (!isChatStarted || !isActive) {
+    console.log('❌ Chat não iniciado ou não ativo, exibindo div vazio', { isChatStarted, isActive });
     // Estado inicial - Vazio
     return (
       <div className="flex-1">

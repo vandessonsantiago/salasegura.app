@@ -7,7 +7,7 @@ import { ChatSession } from '@/hooks/useChatStorage';
 interface MainProps {
   // Common props
   onNewMessage?: (message: string) => void;
-  triggerMessage?: string; // Renomeado de initialMessage
+  triggerMessage?: string;
   className?: string;
   
   // Mode configuration
@@ -22,15 +22,20 @@ export interface MainRef {
   loadSession: (session: ChatSession) => void;
 }
 
-const Main = forwardRef<MainRef, MainProps>(({ 
-  onNewMessage, 
-  triggerMessage, 
+const Main = forwardRef<MainRef, MainProps>(({
+  onNewMessage,
+  triggerMessage,
   className = "",
   mode,
   HeroComponent
 }, ref) => {
   const [chatStarted, setChatStarted] = useState(false);
   const chatContainerRef = useRef<ChatContainerRef>(null);
+
+  // Log when chatStarted changes
+  useEffect(() => {
+    console.log('Chat started:', chatStarted);
+  }, [chatStarted]);
 
   const handleChatStart = (started: boolean) => {
     setChatStarted(started);
@@ -47,10 +52,15 @@ const Main = forwardRef<MainRef, MainProps>(({
   };
 
   const loadSession = (session: ChatSession) => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.loadSession(session);
-      setChatStarted(true);
-    }
+    console.log('Loading session:', session.id);
+    setChatStarted(true);
+    
+    // Use setTimeout to ensure ChatContainer is rendered
+    setTimeout(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.loadSession(session);
+      }
+    }, 0);
   };
 
   useImperativeHandle(ref, () => ({
@@ -69,15 +79,14 @@ const Main = forwardRef<MainRef, MainProps>(({
         {!chatStarted && mode === 'dashboard' && HeroComponent && <HeroComponent />}
         {!chatStarted && (!HeroComponent || mode !== 'dashboard') && <div>Hero não configurado</div>}
         
-        {/* ChatContainer - sempre renderizado, mas pode estar invisível */}
-        <div className={chatStarted ? 'w-full' : 'hidden'}>
-          <ChatContainer 
-            ref={chatContainerRef}
-            onChatStart={handleChatStart}
-            chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
-            triggerMessage={triggerMessage}
-          />
-        </div>
+        {/* ChatContainer - sempre renderizado */}
+        <ChatContainer
+          ref={chatContainerRef}
+          onChatStart={handleChatStart}
+          chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
+          triggerMessage={triggerMessage}
+          isActive={chatStarted}
+        />
       </div>
     </main>
   );

@@ -35,6 +35,17 @@ export default function MessageBlock({
     }
   }, [showActions]); // Dependência em showActions em vez de message.id
 
+  // Esconder ícones após 5 segundos (aumentei o tempo)
+  useEffect(() => {
+    if (showActions) {
+      const timer = setTimeout(() => {
+        setShowActions(false);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showActions]); // Dependência em showActions em vez de message.id
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(message.content);
@@ -76,13 +87,13 @@ export default function MessageBlock({
 
   return (
     <div 
-      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} group mb-16`}
+      className={`flex w-full mb-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       <div 
-        className={`relative px-4 py-3 rounded-lg ${
+        className={`relative max-w-[80%] px-4 py-3 rounded-lg shadow-sm ${
           message.type === 'user' 
-            ? 'bg-teal-600 text-white max-w-xs lg:max-w-md' 
-            : 'text-gray-900 w-full leading-relaxed'
+            ? 'bg-teal-600 text-white rounded-br-sm' 
+            : 'bg-gray-100 text-gray-900 rounded-bl-sm'
         }`}
         onMouseEnter={() => {
           setShowActions(true);
@@ -195,7 +206,7 @@ export default function MessageBlock({
         {/* Ícones de ação */}
         {showActions && (
           <div 
-            className={`absolute -bottom-8 flex gap-1 z-10 ${
+            className={`absolute -bottom-10 flex gap-1 z-10 ${
               message.type === 'user' ? 'right-0' : 'left-0'
             }`}
             onMouseEnter={() => setShowActions(true)}

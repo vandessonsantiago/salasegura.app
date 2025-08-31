@@ -35,6 +35,12 @@ export default function DashboardPage() {
     }
   };
 
+  // Função para limpar triggerMessage quando processado
+  const handleTriggerMessageProcessed = () => {
+    console.log('🧹 [DEBUG] dashboard.handleTriggerMessageProcessed: limpando footerMessage');
+    setFooterMessage('');
+  };
+
   // Função para carregar uma sessão do modal de conversas
   const handleLoadSession = (session: any) => {
     console.log('🔄 Dashboard: Carregando sessão do modal:', {
@@ -75,6 +81,7 @@ export default function DashboardPage() {
         mode="dashboard"
         HeroComponent={Hero}
         triggerMessage={footerMessage}
+        onTriggerMessageProcessed={handleTriggerMessageProcessed}
         onNewMessage={() => {}}
       />
       <Footer 

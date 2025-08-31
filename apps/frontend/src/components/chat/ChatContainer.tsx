@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface ChatContainerProps {
   onChatStart?: (started: boolean) => void;
   onChatReset?: (reset: boolean) => void;
+  onTriggerMessageProcessed?: () => void; // Callback para limpar triggerMessage
   loadSession: (session: ChatSession) => void;
   chatType: 'juridico' | 'conversao';
   triggerMessage?: string; // Nova prop para disparar mensagens
@@ -23,7 +24,7 @@ export interface ChatContainerRef {
   startChat: (message: string) => void;
 }
 
-const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, onChatReset, triggerMessage, chatType = 'conversao', isActive = true }, ref) => {
+const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, onChatReset, onTriggerMessageProcessed, triggerMessage, chatType = 'conversao', isActive = true }, ref) => {
   const [isChatStarted, setIsChatStarted] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
@@ -453,6 +454,40 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       } catch (err) {
         console.error('Erro ao persistir mensagem do usuário (new):', err);
       }
+
+      // Após persistir a mensagem do usuário, obter resposta do assistente
+      try {
+        console.log('🤖 [DEBUG] Solicitando resposta do assistente...');
+        setIsThinking(true);
+        const response = await ChatService.sendMessage(message, chatMessages, session?.access_token, currentSessionId || undefined);
+        console.log('📤 ChatService.sendMessage (new auth) response:', response);
+        setIsThinking(false);
+
+        // Adiciona resposta do assistente
+        setPendingMessage({
+          id: Date.now().toString() + '-assistant',
+          type: 'assistant',
+          content: response.response,
+          timestamp: new Date(),
+          conversionData: response.conversionData || undefined
+        });
+        setIsTyping(true);
+
+        // Atualizar conversationId se retornado pela API
+        if (response.conversationId && !currentSessionId) {
+          setCurrentSessionId(response.conversationId);
+        }
+      } catch (assistantErr) {
+        console.error('Erro ao obter resposta do assistente (new auth):', assistantErr);
+        setIsThinking(false);
+        setPendingMessage({
+          id: Date.now().toString() + '-error',
+          type: 'assistant',
+          content: 'Desculpe, houve um erro ao processar sua mensagem. Tente novamente mais tarde.',
+          timestamp: new Date()
+        });
+        setIsTyping(true);
+      }
     } else {
       // LocalStorage (não autenticado)
       // Adiciona mensagem do usuário
@@ -529,6 +564,12 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     // Resetar o triggerMessage para evitar reprocessamento
     if (onChatReset) {
       onChatReset(true);
+    }
+
+    // Notificar componente pai para limpar triggerMessage
+    if (onTriggerMessageProcessed) {
+      console.log('🧹 [DEBUG] Notificando componente pai para limpar triggerMessage');
+      onTriggerMessageProcessed();
     }
 
     console.log('✅ Chat reiniciado - pronto para nova conversa');

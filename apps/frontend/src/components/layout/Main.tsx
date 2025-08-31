@@ -8,6 +8,7 @@ interface MainProps {
   // Common props
   onNewMessage?: (message: string) => void;
   triggerMessage?: string; // Renomeado de initialMessage
+  onTriggerMessageProcessed?: () => void; // Callback para limpar triggerMessage
   className?: string;
 
   // Mode configuration
@@ -28,6 +29,7 @@ export interface MainRef {
 const Main = forwardRef<MainRef, MainProps>(({
   onNewMessage,
   triggerMessage,
+  onTriggerMessageProcessed,
   className = "",
   mode,
   HeroComponent,
@@ -83,6 +85,13 @@ const Main = forwardRef<MainRef, MainProps>(({
     console.log('✅ [DEBUG] Main.handleChatReset: chatReset definido como', reset, '- chatStarted permanece', chatStarted);
     if (onChatReset) {
       onChatReset(reset);
+    }
+  };
+
+  const handleTriggerMessageProcessed = () => {
+    console.log('🧹 [DEBUG] Main.handleTriggerMessageProcessed: limpando triggerMessage');
+    if (onTriggerMessageProcessed) {
+      onTriggerMessageProcessed();
     }
   };
 
@@ -161,6 +170,7 @@ const Main = forwardRef<MainRef, MainProps>(({
             ref={chatContainerRef}
             onChatStart={handleChatStart}
             onChatReset={handleChatReset}
+            onTriggerMessageProcessed={handleTriggerMessageProcessed}
             chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
             triggerMessage={triggerMessage}
             loadSession={loadSession}

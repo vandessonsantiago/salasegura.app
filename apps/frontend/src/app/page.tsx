@@ -38,6 +38,12 @@ export default function LandingPage() {
     }
   };
 
+  // Função para limpar triggerMessage quando processado
+  const handleTriggerMessageProcessed = () => {
+    console.log('🧹 [DEBUG] page.handleTriggerMessageProcessed: limpando footerMessage');
+    setFooterMessage('');
+  };
+
   // Função para carregar sessão do modal
   const handleLoadSession = (session: ChatSession) => {
     console.log('🔄 page.handleLoadSession chamado:', session);
@@ -73,6 +79,7 @@ export default function LandingPage() {
         ref={mainRef}
         mode="landing"
         triggerMessage={footerMessage}
+        onTriggerMessageProcessed={handleTriggerMessageProcessed}
         onNewMessage={() => {}}
       />
       <Footer 

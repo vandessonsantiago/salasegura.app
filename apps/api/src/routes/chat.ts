@@ -500,28 +500,9 @@ router.post('/', async (req, res) => {
       conversationId: currentConversationId, // Incluir ID da conversa na resposta
     };
 
-    // Salvar resposta do assistente se usuário estiver autenticado
-    if (isAuthenticatedRequest && currentConversationId && userId) {
-      try {
-        await supabase
-          .from('chat_messages')
-          .insert({
-            conversation_id: currentConversationId,
-            role: 'assistant',
-            content: finalResponse
-          });
-
-        // Atualizar timestamp da conversa
-        await supabase
-          .from('chat_conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', currentConversationId);
-
-        console.log('💾 Resposta do assistente salva no banco');
-      } catch (saveError) {
-        console.error('❌ Erro ao salvar resposta no banco:', saveError);
-      }
-    }
+    // Remover salvamento automático da resposta do assistente
+    // O ChatContainer cuidará disso para evitar duplicação
+    console.log('� Resposta gerada, ChatContainer salvará no frontend');
 
     console.log('📤 Enviando resposta:', {
       responseLength: finalResponse.length,

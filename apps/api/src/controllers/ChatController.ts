@@ -5,13 +5,29 @@ export class ChatController {
 	// Buscar todas as conversas do usuário autenticado
 	static async getUserConversations(req: Request, res: Response) {
 		const userId = req.user?.id;
-		if (!userId) return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+		
+		if (!userId) {
+			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+		}
+
+		// Otimização: buscar apenas campos necessários e limitar resultados
 		const { data, error } = await supabase
 			.from('chat_conversations')
-			.select('*')
+			.select('id, title, created_at, updated_at')
 			.eq('user_id', userId)
-			.order('created_at', { ascending: false });
-		if (error) return res.status(500).json({ success: false, error: error.message });
+			.order('updated_at', { ascending: false })
+			.limit(50); // Limitar para melhorar performance
+
+		if (error) {
+			return res.status(500).json({ success: false, error: error.message });
+		}
+
+		// Adicionar cache headers para melhorar performance
+		res.set({
+			'Cache-Control': 'private, max-age=30', // Cache por 30 segundos
+			'ETag': `"conversations-${userId}-${Date.now()}"`
+		});
+
 		return res.json({ success: true, data });
 	}
 
@@ -33,20 +49,10 @@ export class ChatController {
 			.select('id, conversation_id, role, content, created_at')
 			.eq('conversation_id', conversationId)
 			.order('created_at', { ascending: true });
-		if (error) return res.status(500).json({ success: false, error: error.message });
-		
-		console.log('🔍 ChatController.getConversationMessages - Raw data from Supabase:', {
-			conversationId,
-			data,
-			error,
-			dataLength: data?.length,
-			firstMessage: data?.[0] ? {
-				id: data[0].id,
-				role: data[0].role,
-				content: data[0].content?.substring(0, 50),
-				created_at: data[0].created_at
-			} : null
-		});
+			
+		if (error) {
+			return res.status(500).json({ success: false, error: error.message });
+		}
 		
 		return res.json({ success: true, data });
 	}
@@ -55,10 +61,8 @@ export class ChatController {
 	static async createConversation(req: Request, res: Response) {
 		const userId = req.user?.id;
 		const { title } = req.body;
-		console.log('🏗️ ChatController.createConversation:', { userId, title, hasUser: !!req.user });
 		
 		if (!userId) {
-			console.log('❌ Usuário não autenticado');
 			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
 		}
 		
@@ -66,7 +70,6 @@ export class ChatController {
 			user_id: userId,
 			title: title || `Conversa ${new Date().toLocaleDateString('pt-BR')}`
 		};
-		console.log('📝 Dados para inserir conversa:', conversationData);
 		
 		const { data, error } = await supabase
 			.from('chat_conversations')
@@ -75,11 +78,9 @@ export class ChatController {
 			.single();
 			
 		if (error) {
-			console.log('❌ Erro ao criar conversa:', error);
 			return res.status(500).json({ success: false, error: error.message });
 		}
 		
-		console.log('✅ Conversa criada com sucesso:', data);
 		return res.status(201).json({ success: true, data });
 	}
 
@@ -89,19 +90,10 @@ export class ChatController {
 		const conversationId = req.params.id;
 		const { sender, content } = req.body;
 		
-		console.log('💾 ChatController.addMessage chamado:', { 
-			userId, 
-			conversationId, 
-			sender, 
-			content: content?.substring(0, 50),
-			hasUser: !!req.user,
-			body: req.body
-		});
-		
 		if (!userId) {
-			console.log('❌ Usuário não autenticado');
 			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
 		}
+		
 		// Verifica se a conversa pertence ao usuário
 		const { data: conv, error: convErr } = await supabase
 			.from('chat_conversations')
@@ -109,26 +101,9 @@ export class ChatController {
 			.eq('id', conversationId)
 			.eq('user_id', userId)
 			.single();
-		if (convErr || !conv) return res.status(404).json({ success: false, error: 'Conversa não encontrada' });
-		
-		// Verificar se a tabela chat_messages existe e tem a estrutura correta
-		try {
-			// Tentar uma query simples para ver se a tabela existe
-			const { error: testError } = await supabase
-				.from('chat_messages')
-				.select('count')
-				.limit(1)
-				.single();
 			
-			if (testError) {
-				console.log('📝 Problema com tabela chat_messages:', testError.message);
-				
-				// Se a tabela não existe, tentar criar através de uma inserção que force a criação
-				// Por enquanto, vamos tentar trabalhar sem a coluna sender
-				console.log('� Tentando abordagem alternativa sem coluna sender...');
-			}
-		} catch (setupError) {
-			console.error('❌ Erro durante verificação da tabela:', setupError);
+		if (convErr || !conv) {
+			return res.status(404).json({ success: false, error: 'Conversa não encontrada' });
 		}
 		
 		// Tentar inserção com a coluna role (que parece existir na tabela)
@@ -146,14 +121,10 @@ export class ChatController {
 			.insert(insertData)
 			.select(selectFields)
 			.single();
-		if (error) return res.status(500).json({ success: false, error: error.message });
-		
-		console.log('🔍 ChatController.addMessage - Data saved:', {
-			conversationId,
-			sender,
-			content: content.substring(0, 50),
-			data
-		});
+			
+		if (error) {
+			return res.status(500).json({ success: false, error: error.message });
+		}
 		
 		return res.status(201).json({ success: true, data });
 	}

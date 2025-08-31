@@ -93,7 +93,7 @@ export default function AgendamentoModal({
     message: string
   } | null>(null)
 
-  const { addConsulta } = useAgendamentos()
+  const { addConsulta, refresh: refreshAgendamentos } = useAgendamentos()
   const { user } = useAuth()
   const toast = useToast()
   // Atualizar telefone quando mudar - forçar re-render do hook
@@ -348,51 +348,35 @@ export default function AgendamentoModal({
         // PIX foi gerado, mas pagamento ainda não foi confirmado
         // Apenas armazenar os dados para uso posterior
         console.log("PIX gerado com sucesso, aguardando confirmação do pagamento")
+
+        // 🔄 Forçar refresh para mostrar dados PIX atualizados
+        if (refreshAgendamentos) {
+          console.log("🔄 Forçando refresh após geração do PIX...")
+          await refreshAgendamentos()
+        }
+
         return
       }
 
       if (status === 'CONFIRMED') {
-        // Pagamento foi confirmado - AGORA criar o agendamento
-        const consultaComPix = {
-          id: `temp_${Date.now()}`, // ID temporário, será substituído pelo backend
-          data: selectedDate,
-          horario: selectedTime,
-          status: 'CONFIRMED' as const,
-          paymentId: paymentId,
-          paymentStatus: 'CONFIRMED' as const,
-          valor: 99.0,
-          descricao: `Agendamento para ${selectedDate} às ${selectedTime} - Consulta de 45 minutos`,
-          cliente: {
-            nome: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
-            email: user?.email || "",
-            telefone: clienteTelefone || "(92) 99999-9999",
-          },
-          createdAt: new Date().toISOString(),
-          qrCodePix: pixData?.qrCode || '',
-          copyPastePix: pixData?.copyPaste || '',
-          pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
-          calendarEventId: selectedSlotDetail?.calendarEventId || selectedSlotDetail?.eventId,
-          googleMeetLink: selectedSlotDetail?.googleMeetLink || selectedSlotDetail?.meetLink,
+        // 🔧 CORREÇÃO: Pagamento foi confirmado - NÃO criar novo agendamento
+        // O agendamento já foi criado durante o checkout e será atualizado via webhook
+        console.log("✅ Pagamento confirmado! Agendamento será atualizado automaticamente via webhook")
+
+        // Fechar modal e mostrar sucesso
+        setShowCheckout(false)
+        onClose()
+
+        toast.success(
+          'Agendamento Confirmado!',
+          'Seu agendamento foi confirmado com sucesso. Você receberá os detalhes por email.'
+        )
+
+        // 🔄 Forçar refresh imediato para mostrar status atualizado
+        if (refreshAgendamentos) {
+          console.log("🔄 Forçando refresh após confirmação do pagamento...")
+          await refreshAgendamentos()
         }
-
-        // Salva no backend com dados completos do PIX
-        const novaConsulta = await addConsulta(consultaComPix)
-        if (!novaConsulta || !novaConsulta.id) {
-          setFeedbackMessage({
-            type: 'error',
-            message: 'Erro ao criar agendamento. Tente novamente.'
-          })
-          return
-        }
-
-        // Armazenar o ID do agendamento criado
-        setCurrentAgendamentoId(novaConsulta.id)
-
-        console.log("✅ Agendamento criado com sucesso com dados PIX:", novaConsulta.id)
-        setFeedbackMessage({
-          type: 'success',
-          message: 'Pagamento confirmado! Seu agendamento foi criado com sucesso.'
-        })
       }
 
     } catch (error) {

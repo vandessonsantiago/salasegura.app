@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS agendamentos (
   service_type text,
   CONSTRAINT agendamentos_pkey PRIMARY KEY (id),
   CONSTRAINT agendamentos_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id),
-  CONSTRAINT agendamentos_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(asaas_id)
+  CONSTRAINT agendamentos_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(asaas_id),
+  -- 🔧 CORREÇÃO: Adicionar constraints únicos para prevenir duplicatas
+  CONSTRAINT agendamentos_unique_user_date_time UNIQUE (user_id, data, horario),
+  CONSTRAINT agendamentos_unique_payment_id UNIQUE (payment_id)
 );
 
 -- Indexes for agendamentos table

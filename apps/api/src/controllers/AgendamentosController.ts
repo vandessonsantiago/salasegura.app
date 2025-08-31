@@ -217,6 +217,44 @@ export class AgendamentosController {
         return;
       }
 
+      // 🔧 CORREÇÃO: Verificar se já existe agendamento para esta data/horário
+      const { data: existingAgendamento, error: checkError } = await supabase
+        .from("agendamentos")
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("data", req.body?.data)
+        .eq("horario", req.body?.horario)
+        .single();
+
+      if (checkError && checkError.code !== "PGRST116") { // PGRST116 = not found
+        console.error("Erro ao verificar duplicatas:", checkError);
+        res.status(500).json({
+          success: false,
+          error: "Erro interno do servidor",
+        });
+        return;
+      }
+
+      if (existingAgendamento) {
+        console.log("⚠️ Agendamento já existe para esta data/horário:", existingAgendamento.id);
+        // Se já existe e está pendente, podemos reutilizar
+        if (existingAgendamento.status === "pending_payment") {
+          console.log("✅ Reutilizando agendamento pendente existente");
+          res.json({
+            success: true,
+            data: existingAgendamento,
+            message: "Agendamento pendente reutilizado"
+          });
+          return;
+        } else {
+          res.status(409).json({
+            success: false,
+            error: "Já existe um agendamento confirmado para esta data e horário",
+          });
+          return;
+        }
+      }
+
       // Garantir que haja um id (a tabela exige id NOT NULL sem default)
       const generatedId = (req.body && (req.body.id || req.body.id === 0)) ? req.body.id : randomUUID();
 
@@ -232,9 +270,13 @@ export class AgendamentosController {
         updated_at: new Date().toISOString(),
       };
 
+      // 🔧 CORREÇÃO: Usar upsert em vez de insert para maior segurança
       const { data, error } = await supabase
         .from("agendamentos")
-        .insert([agendamentoData])
+        .upsert([agendamentoData], {
+          onConflict: "user_id,data,horario",
+          ignoreDuplicates: false
+        })
         .select()
         .single();
 

@@ -67,7 +67,7 @@ export class CheckoutService {
     checkoutData: CheckoutData
   ): Promise<CheckoutResponse> {
     try {
-      console.log("🎯 [CHECKOUT] Iniciando processamento consolidado...");
+      console.log("🎯 [CHECKOUT] 🔍 DEBUG: processarCheckoutCompleto INICIADO");
       console.log("📋 [CHECKOUT] Service Type:", checkoutData.serviceType);
       console.log("👤 [CHECKOUT] User ID:", checkoutData.userId);
 
@@ -176,6 +176,7 @@ export class CheckoutService {
       console.log("✅ [AGENDAMENTO] Agendamento criado:", agendamentoResult.agendamento.id);
 
       // 2. Processar pagamento
+      console.log("🔍 [DEBUG] Antes de chamar processarPagamentoAsaas");
       const paymentResult = await CheckoutService.processarPagamentoAsaas(
         checkoutData.cliente,
         checkoutData.valor,
@@ -189,6 +190,16 @@ export class CheckoutService {
       }
 
       // 3. Atualizar agendamento com dados do pagamento
+      console.log("🔍 [DEBUG] Antes de chamar atualizarComDadosPagamento");
+      console.log("🔍 [DEBUG] Dados para atualizar:", {
+        agendamentoId: agendamentoResult.agendamento.id,
+        paymentId: paymentResult.paymentId,
+        paymentStatus: 'PENDING',
+        hasQrCode: !!paymentResult.qrCodePix,
+        hasCopyPaste: !!paymentResult.copyPastePix,
+        hasExpiresAt: !!paymentResult.pixExpiresAt,
+      });
+
       await AgendamentoService.atualizarComDadosPagamento(agendamentoResult.agendamento.id!, {
         paymentId: paymentResult.paymentId!,
         paymentStatus: 'PENDING',
@@ -196,6 +207,8 @@ export class CheckoutService {
         copyPastePix: paymentResult.copyPastePix!,
         pixExpiresAt: paymentResult.pixExpiresAt!,
       });
+
+      console.log("🔍 [DEBUG] atualizarComDadosPagamento chamado com sucesso");
 
       console.log("✅ [AGENDAMENTO] Checkout de agendamento processado com sucesso");
 
@@ -259,6 +272,7 @@ export class CheckoutService {
     error?: string;
   }> {
     try {
+      console.log("💰 [PAGAMENTO] 🔍 DEBUG: processarPagamentoAsaas EXECUTADO!");
       console.log("💰 [PAGAMENTO] Processando pagamento no Asaas...");
       console.log("👤 [PAGAMENTO] Cliente:", cliente.name);
       console.log("💵 [PAGAMENTO] Valor:", valor);
@@ -342,10 +356,10 @@ export class CheckoutService {
       console.log("✅ [PAGAMENTO] Dados PIX obtidos");
 
       // Inserir dados do pagamento na tabela payments do Supabase
-      try {
-        const { supabaseAdmin } = require('../lib/supabase');
-        const paymentRecordId = randomUUID();
+      const { supabaseAdmin } = require('../lib/supabase');
+      const paymentRecordId = randomUUID();
 
+      try {
         const { error: insertError } = await supabaseAdmin
           .from('payments')
           .insert({
@@ -371,7 +385,7 @@ export class CheckoutService {
 
       return {
         success: true,
-        paymentId,
+        paymentId: paymentRecordId, // 🔧 CORREÇÃO: Retornar o ID interno do Supabase, não o asaas_id
         qrCodePix: pixData.encodedImage,
         copyPastePix: pixData.payload,
         pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),

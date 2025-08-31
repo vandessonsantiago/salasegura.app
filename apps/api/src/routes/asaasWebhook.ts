@@ -143,6 +143,29 @@ router.post('/', async (req: Request, res: Response) => {
         console.log(`📅 Webhook detectou agendamento: ${agendamentoId}`);
       }
 
+      // 🔧 CORREÇÃO: Verificar se o agendamento já foi processado anteriormente
+      const { data: currentAgendamento, error: checkStatusError } = await supabaseAdmin
+        .from(tableName)
+        .select('status, payment_status, updated_at')
+        .eq('id', agendamentoId)
+        .single();
+
+      if (checkStatusError) {
+        console.error(`❌ Erro ao verificar status atual do ${serviceType}:`, checkStatusError);
+      } else if (currentAgendamento) {
+        // Verificar se já está em status final
+        const finalStatuses = ['confirmed', 'payment_received', 'completed', 'cancelled'];
+        if (finalStatuses.includes(currentAgendamento.status)) {
+          console.log(`⚠️ ${serviceType} ${agendamentoId} já está em status final: ${currentAgendamento.status}`);
+          // Ainda continua o processamento para garantir consistência, mas loga
+        }
+
+        // Verificar se o payment_status já foi atualizado
+        if (currentAgendamento.payment_status === payment.status) {
+          console.log(`⚠️ ${serviceType} ${agendamentoId} já tem payment_status: ${payment.status}`);
+        }
+      }
+
       // Reconhecer todos os status válidos do Asaas que indicam pagamento concluído
       const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'];
       const recordStatus = completedStatuses.includes(payment.status)
@@ -153,12 +176,17 @@ router.post('/', async (req: Request, res: Response) => {
         .from(tableName)
         .update({
           status: recordStatus,
+          payment_status: payment.status,
           updated_at: new Date().toISOString()
         })
         .eq('id', agendamentoId);
 
       if (updateError) {
         console.error(`❌ Erro ao atualizar ${serviceType}:`, updateError);
+        // 🔧 CORREÇÃO: Se erro for de duplicata, não falhar completamente
+        if (updateError.code === '23505') { // unique_violation
+          console.log(`⚠️ Tentativa de atualização duplicada detectada para ${serviceType} ${agendamentoId}`);
+        }
       } else {
         console.log(`✅ ${serviceType} ${agendamentoId} atualizado para ${recordStatus}`);
 

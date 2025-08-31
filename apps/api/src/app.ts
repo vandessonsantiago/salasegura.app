@@ -59,3 +59,4 @@ export const createApp = (): express.Express => {
 };
 
 export default createApp;
+console.log('🔍 TESTE: Servidor iniciado');

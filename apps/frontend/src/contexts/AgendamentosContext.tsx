@@ -475,6 +475,90 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  // Sistema de polling para verificar atualizações de status de pagamento
+  useEffect(() => {
+    if (!session?.access_token || consultasAgendadas.length === 0) return
+
+    // Verificar apenas agendamentos com status PENDING
+    const pendingConsultas = consultasAgendadas.filter(c => c.status === 'PENDING' && c.paymentId)
+
+    if (pendingConsultas.length === 0) return
+
+    console.log(`🔄 [POLLING] Iniciando polling para ${pendingConsultas.length} agendamentos pendentes`)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        console.log('🔄 [POLLING] Verificando atualizações de status...')
+
+        const result = await authJsonFetch(
+          "/agendamento",
+          session.access_token,
+          { method: 'GET' }
+        )
+
+        if (result && result.success && result.data) {
+          // Verificar se houve mudanças nos status
+          let hasChanges = false
+          const updatedConsultas = consultasAgendadas.map(existing => {
+            const backendItem = result.data.find((item: any) => item.id === existing.id)
+            if (backendItem) {
+              // Verificar se o status mudou
+              const currentStatus = existing.status
+              const backendStatus = backendItem.status?.toLowerCase()
+              const paymentStatus = backendItem.payment_status
+
+              // Mapeamento de status do backend
+              const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED']
+              const newStatus = paymentStatus && completedStatuses.includes(paymentStatus) ? 'CONFIRMED' :
+                               backendStatus === 'confirmed' ? 'CONFIRMED' :
+                               backendStatus === 'pending_payment' ? 'PENDING' :
+                               backendStatus === 'cancelled' ? 'CANCELLED' :
+                               backendStatus === 'expired' ? 'EXPIRED' : 'PENDING'
+
+              if (newStatus !== currentStatus) {
+                console.log(`🔄 [POLLING] Status mudou para ${existing.id}: ${currentStatus} -> ${newStatus}`)
+                hasChanges = true
+                return {
+                  ...existing,
+                  status: newStatus as ConsultaAgendada["status"],
+                  paymentStatus: paymentStatus,
+                  qrCodePix: backendItem.qr_code_pix,
+                  copyPastePix: backendItem.copy_paste_pix,
+                  pixExpiresAt: backendItem.pix_expires_at,
+                }
+              }
+
+              // Verificar se os dados PIX foram adicionados
+              if (!existing.qrCodePix && backendItem.qr_code_pix) {
+                console.log(`🔄 [POLLING] Dados PIX adicionados para ${existing.id}`)
+                hasChanges = true
+                return {
+                  ...existing,
+                  qrCodePix: backendItem.qr_code_pix,
+                  copyPastePix: backendItem.copy_paste_pix,
+                  pixExpiresAt: backendItem.pix_expires_at,
+                }
+              }
+            }
+            return existing
+          })
+
+          if (hasChanges) {
+            console.log('✅ [POLLING] Atualizações detectadas, recarregando lista completa...')
+            await loadConsultasFromStorage() // Recarregar tudo para garantir consistência
+          }
+        }
+      } catch (error) {
+        console.error('❌ [POLLING] Erro no polling:', error)
+      }
+    }, 30000) // Verificar a cada 30 segundos
+
+    return () => {
+      console.log('🛑 [POLLING] Parando polling')
+      clearInterval(pollInterval)
+    }
+  }, [consultasAgendadas, session?.access_token, loadConsultasFromStorage])
+
   return (
     <AgendamentosContext.Provider
       value={{

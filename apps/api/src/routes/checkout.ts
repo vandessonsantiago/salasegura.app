@@ -372,10 +372,59 @@ async function createPayment(paymentData: any): Promise<any> {
   }
 }
 
+// ROTA TEMPORÁRIA PARA DEBUG - checkout sem autenticação
+router.post("/debug", async (req, res) => {
+  try {
+    console.log("🔍 [DEBUG] Checkout sem autenticação chamado!");
+    console.log("📥 Request body:", JSON.stringify(req.body, null, 2));
+
+    // Mesmo código da rota original, mas sem validação de autenticação
+    const validatedData = checkoutRequestSchema.parse(req.body);
+    console.log("✅ [DEBUG] Dados validados:", JSON.stringify(validatedData, null, 2));
+
+    const checkoutData = {
+      cliente: {
+        name: validatedData.customer.name,
+        email: validatedData.customer.email,
+        cpfCnpj: validatedData.customer.cpfCnpj,
+        phone: validatedData.customer.phone || "",
+      },
+      valor: validatedData.value,
+      descricao: validatedData.description,
+      serviceType: validatedData.serviceType,
+      serviceData: validatedData.serviceData || {},
+      data: validatedData.data,
+      horario: validatedData.horario,
+      calendarEventId: validatedData.calendarEventId,
+      googleMeetLink: validatedData.googleMeetLink,
+    };
+
+    console.log("🚀 [DEBUG] Chamando CheckoutService.processarCheckoutCompleto...");
+
+    // Mock do req.user para simular usuário autenticado
+    const mockReq = req as any;
+    mockReq.user = { id: 'ac963a9a-57b0-4996-8d2b-1d70faf5564d', email: 'test@example.com' };
+
+    const result = await CheckoutService.processarCheckoutCompleto(mockReq, checkoutData);
+
+    console.log("✅ [DEBUG] Resultado do checkout:", result);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("❌ [DEBUG] Erro no checkout debug:", error);
+    res.status(500).json({ error: "Erro interno", details: (error as any).message });
+  }
+});
+
 // Rota POST /api/checkout
 router.post("/", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log("📥 Request recebido:", JSON.stringify(req.body, null, 2))
+    console.log("� [CHECKOUT] Rota autenticada chamada!");
+    console.log("�📥 [CHECKOUT] Request body:", JSON.stringify(req.body, null, 2));
 
     // Validar request body
     const validatedData = checkoutRequestSchema.parse(req.body)

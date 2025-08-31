@@ -470,21 +470,61 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     }
   };
 
-  // Reiniciar chat
+  // Reiniciar chat (interface apenas, preserva conversa no banco)
   const handleRestartChat = () => {
+    console.log('🔄 Reiniciando chat (interface) - permitindo nova conversa');
+    
+    // Resetar apenas o estado da interface, mantendo a conversa salva
     setIsChatStarted(false);
     setChatMessages([]);
     setIsThinking(false);
     setIsTyping(false);
     setPendingMessage(null);
+    
+    // Resetar currentSessionId para permitir nova conversa
     setCurrentSessionId(null);
-  };  const resetChat = () => {
-    console.log('🔄 Resetando chat...');
+    
+    // Resetar flag para permitir criação de nova conversa
     conversationCreatedRef.current = false;
+    
+    // Resetar flags de controle
     processingMessageRef.current = false;
     lastTriggerRef.current = '';
     savingMessageRef.current = false;
-    handleRestartChat();
+    
+    // Notificar parent sobre mudança de estado
+    if (onChatStart) {
+      onChatStart(false);
+    }
+    
+    console.log('✅ Chat reiniciado - pronto para nova conversa');
+  };  const resetChat = () => {
+    console.log('🔄 Resetando chat (interface) - permitindo nova conversa');
+    
+    // Mesmo comportamento do handleRestartChat
+    setIsChatStarted(false);
+    setChatMessages([]);
+    setIsThinking(false);
+    setIsTyping(false);
+    setPendingMessage(null);
+    
+    // Resetar currentSessionId para permitir nova conversa
+    setCurrentSessionId(null);
+    
+    // Resetar flag para permitir criação de nova conversa
+    conversationCreatedRef.current = false;
+    
+    // Resetar flags de controle
+    processingMessageRef.current = false;
+    lastTriggerRef.current = '';
+    savingMessageRef.current = false;
+    
+    // Notificar parent sobre mudança de estado
+    if (onChatStart) {
+      onChatStart(false);
+    }
+    
+    console.log('✅ Chat resetado - pronto para nova conversa');
   };
 
   const loadSession = (session: ChatSession) => {
@@ -580,9 +620,10 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
         <h3 className="text-lg font-semibold text-gray-900">Conversa</h3>
         <button
           onClick={handleRestartChat}
-          className="text-sm text-gray-500 hover:text-gray-700 underline"
+          className="text-sm text-teal-600 hover:text-teal-700 underline transition-colors"
+          title="Limpar chat atual e iniciar uma nova conversa (conversa anterior ficará salva)"
         >
-          Nova conversa
+          🆕 Nova conversa
         </button>
       </div>
 

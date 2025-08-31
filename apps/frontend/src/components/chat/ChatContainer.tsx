@@ -72,6 +72,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   const isLoadingSessionRef = useRef(false);
   const processingMessageRef = useRef(false);
   const conversationCreatedRef = useRef(false);
+  const savingMessageRef = useRef(false);
   
   useEffect(() => {
     console.log('🔍 ChatContainer useEffect triggerMessage:', { triggerMessage, isChatStarted, isProcessing: processingMessageRef.current, conversationCreated: conversationCreatedRef.current });
@@ -114,10 +115,13 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       currentSessionId,
       isAuthenticated,
       hasAuthChat: !!authChat,
+      isSaving: savingMessageRef.current,
       timestamp: new Date().toISOString()
     });
 
-    if (pendingMessage) {
+    if (pendingMessage && !savingMessageRef.current) {
+      savingMessageRef.current = true;
+      
       console.log('💾 Saving assistant message to DB:', {
         conversationId: currentSessionId,
         type: pendingMessage.type,
@@ -144,8 +148,10 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       } else if (currentSessionId) {
         updateSession(currentSessionId, updatedMessages);
       }
+      
+      savingMessageRef.current = false;
     } else {
-      console.log('⚠️ handleTypingComplete called but no pendingMessage');
+      console.log('⚠️ handleTypingComplete called but no pendingMessage or already saving');
     }
   };
 
@@ -477,6 +483,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     conversationCreatedRef.current = false;
     processingMessageRef.current = false;
     lastTriggerRef.current = '';
+    savingMessageRef.current = false;
     handleRestartChat();
   };
 
@@ -493,6 +500,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     setIsThinking(false);
     setIsTyping(false);
     setPendingMessage(null);
+    savingMessageRef.current = false;
     
     // Notify parent
     if (onChatStart) {

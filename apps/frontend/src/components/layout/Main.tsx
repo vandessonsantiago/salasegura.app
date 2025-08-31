@@ -54,7 +54,13 @@ const Main = forwardRef<MainRef, MainProps>(({
   };
 
   const loadSession = (session: ChatSession) => {
-    console.log('🔄 Main.loadSession chamado:', { session, chatStarted, hasChatContainerRef: !!chatContainerRef.current });
+    console.log('🔄 Main.loadSession chamado:', {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      messageCount: session.messages.length,
+      chatStarted,
+      hasChatContainerRef: !!chatContainerRef.current
+    });
     if (chatContainerRef.current) {
       console.log('📤 Main chamando chatContainerRef.current.loadSession');
       chatContainerRef.current.loadSession(session);

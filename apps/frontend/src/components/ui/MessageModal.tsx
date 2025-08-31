@@ -34,7 +34,9 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
         let isMounted = true;
         const fetchConversations = async () => {
           try {
+            console.log('📡 MessageModal: Iniciando busca de conversas...');
             const conversations = await authChat.fetchConversations();
+            console.log('✅ MessageModal: Conversas encontradas:', conversations.length);
             if (isMounted) {
               // Buscar contagem de mensagens para cada conversa
               const conversationsWithMessageCount = await Promise.allSettled(
@@ -101,10 +103,16 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   };
 
   const handleLoadSession = async (session: ChatSession) => {
-    console.log('🔄 MessageModal.handleLoadSession chamado:', session);
+    console.log('🔄 MessageModal.handleLoadSession chamado:', {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      messageCount: session.messages.length,
+      isAuthenticated
+    });
     if (isAuthenticated && session.id) {
       try {
         // Carregar mensagens da conversa do backend
+        console.log('📡 MessageModal: Buscando mensagens do backend para conversa:', session.id);
         const messages = await authChat.fetchMessages(session.id);
         const loadedSession: ChatSession = {
           ...session,
@@ -115,18 +123,24 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
             timestamp: new Date(msg.created_at)
           }))
         };
-        console.log('✅ MessageModal: sessão carregada com mensagens:', loadedSession.messages.length);
+        console.log('✅ MessageModal: sessão carregada com mensagens:', {
+          messageCount: loadedSession.messages.length,
+          firstMessage: loadedSession.messages[0]?.content?.substring(0, 50) + '...',
+          lastMessage: loadedSession.messages[loadedSession.messages.length - 1]?.content?.substring(0, 50) + '...'
+        });
         if (onLoadSession) {
           onLoadSession(loadedSession);
-          console.log('✅ MessageModal: onLoadSession chamado');
+          console.log('✅ MessageModal: onLoadSession chamado com sessão carregada');
           onClose();
+        } else {
+          console.log('❌ MessageModal: onLoadSession não definido');
         }
       } catch (error) {
         console.error('Erro ao carregar mensagens da conversa:', error);
         // Fallback: carregar sem mensagens
         if (onLoadSession) {
           onLoadSession(session);
-          console.log('✅ MessageModal: onLoadSession chamado (fallback)');
+          console.log('✅ MessageModal: onLoadSession chamado (fallback sem mensagens)');
           onClose();
         }
       }

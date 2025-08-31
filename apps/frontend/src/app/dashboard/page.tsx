@@ -35,6 +35,14 @@ export default function DashboardPage() {
     }
   };
 
+  // Função para carregar uma sessão do modal de conversas
+  const handleLoadSession = (session: any) => {
+    console.log('🔄 Dashboard: Carregando sessão do modal:', session);
+    if (mainRef.current) {
+      mainRef.current.loadSession(session);
+    }
+  };
+
   // Mostrar loading enquanto verifica autenticação
   if (loading) {
     return <Loading />;
@@ -51,6 +59,7 @@ export default function DashboardPage() {
         showUserMenu={true}
         UserMenuComponent={UserMenu}
         onResetDashboard={handleResetDashboard}
+        onLoadSession={handleLoadSession}
       />
       <Main 
         ref={mainRef} 

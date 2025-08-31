@@ -37,9 +37,9 @@ export default function Header({
     console.log('🔄 Header.handleLoadSession chamado:', session);
     if (onLoadSession) {
       onLoadSession(session);
-      console.log('✅ Header: onLoadSession chamado');
+      console.log('✅ Header: onLoadSession chamado com sucesso');
     } else {
-      console.log('❌ Header: onLoadSession não definido');
+      console.log('❌ Header: onLoadSession não definido - verifique se foi passado como prop');
     }
   };
 

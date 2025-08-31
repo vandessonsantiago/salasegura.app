@@ -64,28 +64,28 @@ export default function Toast({ id, type, title, message, duration = 5000, onClo
   }, [id, duration, onClose]);
 
   return (
-    <div className={`max-w-sm w-full ${style.bg} border ${style.border} rounded-lg p-4 shadow-lg transform transition-all duration-300 ease-in-out`}>
-      <div className="flex items-start">
-        <div className="flex-shrink-0">
+    <div className={`w-full min-w-[320px] max-w-md ${style.bg} border ${style.border} rounded-xl p-6 shadow-2xl transform transition-all duration-300 ease-in-out animate-in slide-in-from-right-2 fade-in backdrop-blur-sm`}>
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 mt-1">
           <IconComponent className={`h-6 w-6 ${style.icon}`} />
         </div>
-        <div className="ml-3 w-0 flex-1 pt-0.5">
-          <p className={`text-sm font-medium ${style.title}`}>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-semibold ${style.title} leading-tight`}>
             {title}
           </p>
           {message && (
-            <p className={`mt-1 text-sm ${style.message}`}>
+            <p className={`mt-2 text-sm ${style.message} leading-relaxed`}>
               {message}
             </p>
           )}
         </div>
-        <div className="ml-4 flex-shrink-0 flex">
+        <div className="flex-shrink-0 ml-2">
           <button
-            className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${style.title} hover:bg-black hover:bg-opacity-5 transition-colors`}
+            className={`inline-flex rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 hover:bg-black hover:bg-opacity-10 ${style.title}`}
             onClick={() => onClose(id)}
           >
             <span className="sr-only">Fechar</span>
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>

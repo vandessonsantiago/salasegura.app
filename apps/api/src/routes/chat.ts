@@ -541,5 +541,6 @@ router.post('/conversations', authenticateToken, ChatController.createConversati
 router.get('/conversations/:id/messages', authenticateToken, ChatController.getConversationMessages);
 router.post('/conversations/:id/messages', authenticateToken, ChatController.addMessage);
 router.delete('/conversations/:id', authenticateToken, ChatController.deleteConversation);
+router.delete('/conversations', authenticateToken, ChatController.deleteAllUserConversations);
 
 export default router;

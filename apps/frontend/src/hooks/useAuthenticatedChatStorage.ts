@@ -221,5 +221,35 @@ export function useAuthenticatedChatStorage(token: string) {
     }
   }, [token]);
 
-  return { conversations, messages, fetchConversations, createConversation, fetchMessages, addMessage, deleteConversation, fetchMessageCount };
+  const deleteAllConversations = useCallback(async () => {
+    if (!token) return false;
+
+    try {
+      const url = apiEndpoint('/chat/conversations');
+      console.log('useAuthenticatedChatStorage.deleteAllConversations calling URL:', url);
+
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        console.warn('useAuthenticatedChatStorage.deleteAllConversations: non-ok response', { status: res.status, body });
+        return false;
+      }
+
+      const result = await res.json();
+      console.log('useAuthenticatedChatStorage.deleteAllConversations: success', result);
+      return result.success || true;
+    } catch (err) {
+      console.error('deleteAllConversations error', err);
+      return false;
+    }
+  }, [token]);
+
+  return { conversations, messages, fetchConversations, createConversation, fetchMessages, addMessage, deleteConversation, deleteAllConversations, fetchMessageCount };
 }

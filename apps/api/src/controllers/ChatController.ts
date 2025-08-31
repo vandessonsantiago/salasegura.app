@@ -161,7 +161,39 @@ export class ChatController {
 
 		console.log('✅ [DELETE] Conversa encontrada, iniciando deleção');
 
-		// Deleta a conversa
+		// Primeiro, deleta todas as mensagens da conversa
+		console.log('🗑️ [DELETE] Deletando mensagens da conversa...');
+		const { error: deleteMessagesErr } = await supabase
+			.from('chat_messages')
+			.delete()
+			.eq('conversation_id', conversationId);
+
+		if (deleteMessagesErr) {
+			console.log('❌ [DELETE] Erro ao deletar mensagens:', deleteMessagesErr);
+			// Tentar uma abordagem alternativa se a primeira falhar
+			console.log('🔄 [DELETE] Tentando abordagem alternativa para deletar mensagens...');
+			const { data: messages, error: fetchMessagesErr } = await supabase
+				.from('chat_messages')
+				.select('id')
+				.eq('conversation_id', conversationId);
+
+			if (!fetchMessagesErr && messages) {
+				for (const message of messages) {
+					await supabase
+						.from('chat_messages')
+						.delete()
+						.eq('id', message.id);
+				}
+				console.log('✅ [DELETE] Mensagens deletadas com abordagem alternativa');
+			} else {
+				return res.status(500).json({ success: false, error: 'Erro ao deletar mensagens da conversa' });
+			}
+		} else {
+			console.log('✅ [DELETE] Mensagens deletadas com sucesso');
+		}
+
+		// Agora deleta a conversa
+		console.log('🗑️ [DELETE] Deletando conversa...');
 		const { error: deleteErr } = await supabase
 			.from('chat_conversations')
 			.delete()
@@ -174,5 +206,78 @@ export class ChatController {
 
 		console.log('✅ [DELETE] Conversa deletada com sucesso');
 		return res.json({ success: true, message: 'Conversa deletada com sucesso' });
+	}
+
+	// Deletar todas as conversas do usuário
+	static async deleteAllUserConversations(req: Request, res: Response) {
+		const userId = req.user?.id;
+
+		console.log('🗑️ [DELETE ALL] Iniciando deleção de todas as conversas:', { userId });
+
+		if (!userId) {
+			console.log('❌ [DELETE ALL] Usuário não autenticado');
+			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+		}
+
+		try {
+			// Primeiro, buscar todas as conversas do usuário
+			const { data: conversations, error: fetchErr } = await supabase
+				.from('chat_conversations')
+				.select('id')
+				.eq('user_id', userId);
+
+			if (fetchErr) {
+				console.log('❌ [DELETE ALL] Erro ao buscar conversas:', fetchErr);
+				return res.status(500).json({ success: false, error: 'Erro ao buscar conversas' });
+			}
+
+			if (!conversations || conversations.length === 0) {
+				console.log('✅ [DELETE ALL] Nenhuma conversa encontrada para deletar');
+				return res.json({ success: true, message: 'Nenhuma conversa para deletar' });
+			}
+
+			console.log(`🗑️ [DELETE ALL] Encontradas ${conversations.length} conversas para deletar`);
+
+			// Deletar todas as mensagens das conversas do usuário
+			console.log('🗑️ [DELETE ALL] Deletando mensagens...');
+			const conversationIds = conversations.map(conv => conv.id);
+			
+			// Usar uma abordagem mais robusta para deletar mensagens
+			for (const conversationId of conversationIds) {
+				const { error: deleteMessagesErr } = await supabase
+					.from('chat_messages')
+					.delete()
+					.eq('conversation_id', conversationId);
+
+				if (deleteMessagesErr) {
+					console.log(`❌ [DELETE ALL] Erro ao deletar mensagens da conversa ${conversationId}:`, deleteMessagesErr);
+					// Continue tentando deletar outras conversas mesmo se uma falhar
+				}
+			}
+
+			console.log('✅ [DELETE ALL] Mensagens deletadas com sucesso');
+
+			// Agora deletar todas as conversas
+			console.log('🗑️ [DELETE ALL] Deletando conversas...');
+			const { error: deleteConversationsErr } = await supabase
+				.from('chat_conversations')
+				.delete()
+				.eq('user_id', userId);
+
+			if (deleteConversationsErr) {
+				console.log('❌ [DELETE ALL] Erro ao deletar conversas:', deleteConversationsErr);
+				return res.status(500).json({ success: false, error: deleteConversationsErr.message });
+			}
+
+			console.log(`✅ [DELETE ALL] ${conversations.length} conversas deletadas com sucesso`);
+			return res.json({ 
+				success: true, 
+				message: `${conversations.length} conversas deletadas com sucesso` 
+			});
+
+		} catch (error) {
+			console.log('❌ [DELETE ALL] Erro inesperado:', error);
+			return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+		}
 	}
 }

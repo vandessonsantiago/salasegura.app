@@ -31,12 +31,36 @@ export function useToast() {
   return context;
 }
 
+export type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
+
 interface ToastProviderProps {
   children: ReactNode;
+  position?: ToastPosition;
 }
 
-export function ToastProvider({ children }: ToastProviderProps) {
+export default function ToastProvider({ children, position = 'top-right' }: ToastProviderProps) {
   const [toasts, setToasts] = useState<ToastData[]>([]);
+
+  const getPositionClasses = (pos: ToastPosition) => {
+    const baseClasses = "fixed z-[9999] space-y-4 max-w-lg";
+    
+    switch (pos) {
+      case 'top-right':
+        return `${baseClasses} top-8 right-8`;
+      case 'top-left':
+        return `${baseClasses} top-8 left-8`;
+      case 'bottom-right':
+        return `${baseClasses} bottom-8 right-8`;
+      case 'bottom-left':
+        return `${baseClasses} bottom-8 left-8`;
+      case 'top-center':
+        return `${baseClasses} top-8 left-1/2 transform -translate-x-1/2`;
+      case 'bottom-center':
+        return `${baseClasses} bottom-8 left-1/2 transform -translate-x-1/2`;
+      default:
+        return `${baseClasses} top-8 right-8`;
+    }
+  };
 
   const addToast = useCallback((type: ToastType, title: string, message?: string, duration = 5000) => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -86,7 +110,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
       {children}
 
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+      <div className={getPositionClasses(position)}>
         {toasts.map((toast) => (
           <Toast
             key={toast.id}
@@ -102,3 +126,6 @@ export function ToastProvider({ children }: ToastProviderProps) {
     </ToastContext.Provider>
   );
 }
+
+// Named export for compatibility
+export { ToastProvider };

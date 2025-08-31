@@ -265,13 +265,14 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
       if (isAuthenticated) {
         try {
           setIsClearingAll(true);
-          const conversations = await authChat.fetchConversations();
-          for (const conversation of conversations) {
-            await authChat.deleteConversation(conversation.id);
+          const deleteSuccess = await authChat.deleteAllConversations();
+          if (deleteSuccess) {
+            // Forçar refresh das conversas
+            setRefreshTrigger(prev => prev + 1);
+            showSuccess('Conversas limpas', 'Todas as conversas foram removidas com sucesso.');
+          } else {
+            showError('Erro ao limpar conversas', 'Tente novamente.');
           }
-          // Forçar refresh das conversas
-          setRefreshTrigger(prev => prev + 1);
-          showSuccess('Conversas limpas', 'Todas as conversas foram removidas com sucesso.');
         } catch (error) {
           console.error('Erro ao limpar conversas do banco de dados:', error);
           showError('Erro ao limpar conversas', 'Tente novamente.');

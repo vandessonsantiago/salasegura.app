@@ -188,5 +188,36 @@ export function useAuthenticatedChatStorage(token: string) {
     }
   }, [token]);
 
-  return { conversations, messages, fetchConversations, createConversation, fetchMessages, addMessage, deleteConversation };
+  // Buscar contagem de mensagens de uma conversa
+  const fetchMessageCount = useCallback(async (conversationId: string): Promise<number> => {
+    try {
+      const url = apiEndpoint(`/chat/conversations/${conversationId}/messages`);
+      console.log('useAuthenticatedChatStorage.fetchMessageCount calling URL:', url);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const status = res.status;
+      const body = await res.text();
+      if (!res.ok) {
+        console.warn('useAuthenticatedChatStorage.fetchMessageCount: non-ok', { status, body: body.substring(0, 500) });
+        return 0;
+      }
+      try {
+        const data = JSON.parse(body);
+        console.log('useAuthenticatedChatStorage.fetchMessageCount: parsed', { 
+          conversationId, 
+          count: (data.data || []).length
+        });
+        return (data.data || []).length;
+      } catch (e) {
+        console.warn('useAuthenticatedChatStorage.fetchMessageCount: non-json response', { snippet: body.substring(0, 500) });
+        return 0;
+      }
+    } catch (err) {
+      console.error('fetchMessageCount error', err);
+      return 0;
+    }
+  }, [token]);
+
+  return { conversations, messages, fetchConversations, createConversation, fetchMessages, addMessage, deleteConversation, fetchMessageCount };
 }

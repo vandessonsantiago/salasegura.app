@@ -36,14 +36,45 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
           try {
             const conversations = await authChat.fetchConversations();
             if (isMounted) {
-              const filtered = conversations.map((conversation: AuthChatConversation) => ({
-                id: conversation.id,
-                title: conversation.title || `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
-                messages: [],
-                flow: 'free' as ChatSession['flow'], // Explicitly cast to match ChatSession type
-                createdAt: new Date(conversation.created_at),
-                updatedAt: new Date(conversation.updated_at),
-              })).filter((conversation: { title: string }) =>
+              // Buscar contagem de mensagens para cada conversa
+              const conversationsWithMessageCount = await Promise.allSettled(
+                conversations.map(async (conversation: AuthChatConversation) => {
+                  try {
+                    const messageCount = await authChat.fetchMessageCount(conversation.id);
+                    return {
+                      id: conversation.id,
+                      title: conversation.title || `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
+                      messages: Array(messageCount).fill(null).map((_, index) => ({ // Criar array vazio com tamanho correto
+                        id: `temp-${index}`,
+                        type: 'user' as const,
+                        content: '',
+                        timestamp: new Date()
+                      })),
+                      flow: 'free' as ChatSession['flow'],
+                      createdAt: new Date(conversation.created_at),
+                      updatedAt: new Date(conversation.updated_at),
+                    };
+                  } catch (error) {
+                    console.error(`Erro ao buscar contagem de mensagens da conversa ${conversation.id}:`, error);
+                    // Fallback: retornar conversa sem mensagens
+                    return {
+                      id: conversation.id,
+                      title: conversation.title || `Conversa iniciada em ${new Date(conversation.created_at).toLocaleString()}`,
+                      messages: [],
+                      flow: 'free' as ChatSession['flow'],
+                      createdAt: new Date(conversation.created_at),
+                      updatedAt: new Date(conversation.updated_at),
+                    };
+                  }
+                })
+              );
+
+              // Processar resultados, mantendo apenas os fulfilled
+              const processedConversations = conversationsWithMessageCount
+                .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+                .map(result => result.value);
+
+              const filtered = processedConversations.filter((conversation: { title: string }) =>
                 conversation.title.toLowerCase().includes(searchQuery.toLowerCase())
               );
               setFilteredSessions(filtered);

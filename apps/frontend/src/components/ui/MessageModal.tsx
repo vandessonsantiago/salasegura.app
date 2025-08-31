@@ -70,9 +70,10 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   };
 
   const handleLoadSession = async (session: ChatSession) => {
-    console.log('Loading session from modal:', session.id);
+    console.log('🔄 MessageModal.handleLoadSession chamado:', session);
     if (isAuthenticated && session.id) {
       try {
+        // Carregar mensagens da conversa do backend
         const messages = await authChat.fetchMessages(session.id);
         const loadedSession: ChatSession = {
           ...session,
@@ -83,20 +84,27 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
             timestamp: new Date(msg.created_at)
           }))
         };
+        console.log('✅ MessageModal: sessão carregada com mensagens:', loadedSession.messages.length);
         if (onLoadSession) {
           onLoadSession(loadedSession);
+          console.log('✅ MessageModal: onLoadSession chamado');
           onClose();
         }
       } catch (error) {
-        console.error('Error loading session messages:', error);
+        console.error('Erro ao carregar mensagens da conversa:', error);
+        // Fallback: carregar sem mensagens
         if (onLoadSession) {
           onLoadSession(session);
+          console.log('✅ MessageModal: onLoadSession chamado (fallback)');
           onClose();
         }
       }
     } else {
+      // Para sessões locais, usar como está
+      console.log('✅ MessageModal: sessão local carregada');
       if (onLoadSession) {
         onLoadSession(session);
+        console.log('✅ MessageModal: onLoadSession chamado (local)');
         onClose();
       }
     }

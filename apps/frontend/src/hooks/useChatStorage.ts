@@ -14,7 +14,6 @@ export interface ChatMessage {
     userName?: string;
     contactData?: any;
   };
-  alreadySaved?: boolean;
 }
 
 export interface ChatSession {

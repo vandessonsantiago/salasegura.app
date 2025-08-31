@@ -18,6 +18,36 @@ BEGIN
     END IF;
 END $$;
 
+-- Verificar se a coluna role existe na tabela chat_messages, se não existir, renomear sender
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'chat_messages'
+        AND column_name = 'role'
+        AND table_schema = 'public'
+    ) THEN
+        -- Renomear coluna sender para role se ela existir
+        IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'chat_messages'
+            AND column_name = 'sender'
+            AND table_schema = 'public'
+        ) THEN
+            ALTER TABLE public.chat_messages RENAME COLUMN sender TO role;
+            RAISE NOTICE 'Coluna sender renomeada para role com sucesso';
+        ELSE
+            -- Se nenhuma das colunas existir, adicionar role
+            ALTER TABLE public.chat_messages ADD COLUMN role VARCHAR(32) NOT NULL DEFAULT 'user';
+            RAISE NOTICE 'Coluna role adicionada com sucesso';
+        END IF;
+    ELSE
+        RAISE NOTICE 'Coluna role já existe, pulando...';
+    END IF;
+END $$;
+
 -- Verificar se a foreign key constraint existe, se não existir, adicioná-la
 DO $$
 BEGIN

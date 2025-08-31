@@ -34,9 +34,12 @@ export default function Header({
   };
 
   const handleLoadSession = (session: ChatSession) => {
-    console.log('Loading session from header:', session.id);
+    console.log('🔄 Header.handleLoadSession chamado:', session);
     if (onLoadSession) {
       onLoadSession(session);
+      console.log('✅ Header: onLoadSession chamado');
+    } else {
+      console.log('❌ Header: onLoadSession não definido');
     }
   };
 

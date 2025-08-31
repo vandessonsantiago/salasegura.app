@@ -8,9 +8,14 @@ SERVER_PID=$!
 # Aguardar servidor iniciar
 sleep 3
 
-# Testar endpoint
-echo "Testando endpoint de agendamentos..."
-curl -X GET "http://localhost:8001/api/v1/agendamentos" -H "Authorization: Bearer sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c"
+# Testar endpoint de chat
+echo "Testando endpoint de chat..."
+curl -X POST "http://localhost:8001/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Olá, preciso de ajuda com divórcio","chatHistory":[]}'
+
+echo -e "\n\nTestando endpoint de status..."
+curl -X GET "http://localhost:8001/api/v1/chat"
 
 # Matar servidor
 kill $SERVER_PID

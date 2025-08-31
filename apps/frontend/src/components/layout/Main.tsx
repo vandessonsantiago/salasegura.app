@@ -7,7 +7,7 @@ import { ChatSession } from '@/hooks/useChatStorage';
 interface MainProps {
   // Common props
   onNewMessage?: (message: string) => void;
-  triggerMessage?: string;
+  triggerMessage?: string; // Renomeado de initialMessage
   className?: string;
   
   // Mode configuration
@@ -22,9 +22,9 @@ export interface MainRef {
   loadSession: (session: ChatSession) => void;
 }
 
-const Main = forwardRef<MainRef, MainProps>(({
-  onNewMessage,
-  triggerMessage,
+const Main = forwardRef<MainRef, MainProps>(({ 
+  onNewMessage, 
+  triggerMessage, 
   className = "",
   mode,
   HeroComponent
@@ -32,13 +32,15 @@ const Main = forwardRef<MainRef, MainProps>(({
   const [chatStarted, setChatStarted] = useState(false);
   const chatContainerRef = useRef<ChatContainerRef>(null);
 
-  // Log when chatStarted changes
+  // Log quando chatStarted muda
   useEffect(() => {
-    console.log('Chat started:', chatStarted);
+    console.log('🎨 Main: chatStarted mudou para:', chatStarted);
   }, [chatStarted]);
 
   const handleChatStart = (started: boolean) => {
+    console.log('🔔 Main.handleChatStart chamado:', { started, currentChatStarted: chatStarted });
     setChatStarted(started);
+    console.log('✅ Main.handleChatStart: chatStarted definido como', started);
     if (onNewMessage) {
       onNewMessage(started ? 'Chat iniciado' : '');
     }
@@ -52,15 +54,15 @@ const Main = forwardRef<MainRef, MainProps>(({
   };
 
   const loadSession = (session: ChatSession) => {
-    console.log('Loading session:', session.id);
-    setChatStarted(true);
-    
-    // Use setTimeout to ensure ChatContainer is rendered
-    setTimeout(() => {
-      if (chatContainerRef.current) {
-        chatContainerRef.current.loadSession(session);
-      }
-    }, 0);
+    console.log('🔄 Main.loadSession chamado:', { session, chatStarted, hasChatContainerRef: !!chatContainerRef.current });
+    if (chatContainerRef.current) {
+      console.log('📤 Main chamando chatContainerRef.current.loadSession');
+      chatContainerRef.current.loadSession(session);
+      setChatStarted(true);
+      console.log('✅ Main.loadSession: chatStarted definido como true');
+    } else {
+      console.log('❌ Main.loadSession: chatContainerRef.current é null');
+    }
   };
 
   useImperativeHandle(ref, () => ({
@@ -74,19 +76,28 @@ const Main = forwardRef<MainRef, MainProps>(({
   
   return (
     <main className={`${baseClasses} ${modeClasses} ${className}`}>
-      <div className="w-full max-w-full sm:max-w-2xl md:max-w-2xl lg:max-w-5xl mx-auto flex items-center justify-center min-h-full">
+      <div className="w-full max-w-full sm:max-w-2xl md:max-w-2xl lg:max-w-5xl mx-auto flex flex-col items-center justify-center min-h-full">
         {/* Hero - só mostrar quando chat não iniciou */}
-        {!chatStarted && mode === 'dashboard' && HeroComponent && <HeroComponent />}
-        {!chatStarted && (!HeroComponent || mode !== 'dashboard') && <div>Hero não configurado</div>}
+        {!chatStarted && mode === 'dashboard' && HeroComponent && (
+          <div className="flex-1 flex items-center justify-center w-full">
+            <HeroComponent />
+          </div>
+        )}
+        {!chatStarted && (!HeroComponent || mode !== 'dashboard') && (
+          <div className="flex-1 flex items-center justify-center w-full">
+            <div>Hero não configurado</div>
+          </div>
+        )}
         
-        {/* ChatContainer - sempre renderizado */}
-        <ChatContainer
-          ref={chatContainerRef}
-          onChatStart={handleChatStart}
-          chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
-          triggerMessage={triggerMessage}
-          isActive={chatStarted}
-        />
+        {/* ChatContainer - sempre renderizado para processar triggerMessage */}
+        <div className="w-full">
+          <ChatContainer 
+            ref={chatContainerRef}
+            onChatStart={handleChatStart}
+            chatType={mode === 'dashboard' ? 'juridico' : 'conversao'}
+            triggerMessage={triggerMessage}
+          />
+        </div>
       </div>
     </main>
   );

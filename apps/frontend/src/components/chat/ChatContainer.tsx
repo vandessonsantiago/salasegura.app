@@ -70,16 +70,39 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   // Handle triggerMessage
   const lastTriggerRef = useRef<string>('');
   const isLoadingSessionRef = useRef(false);
+  const processingMessageRef = useRef(false);
+  const conversationCreatedRef = useRef(false);
+  
   useEffect(() => {
-    if (triggerMessage && triggerMessage !== lastTriggerRef.current && !isLoadingSessionRef.current) {
+    console.log('🔍 ChatContainer useEffect triggerMessage:', { triggerMessage, isChatStarted, isProcessing: processingMessageRef.current, conversationCreated: conversationCreatedRef.current });
+    
+    if (triggerMessage && triggerMessage !== lastTriggerRef.current && !isLoadingSessionRef.current && !processingMessageRef.current) {
+      console.log('✅ Processando triggerMessage:', triggerMessage);
+      processingMessageRef.current = true;
       lastTriggerRef.current = triggerMessage;
       const cleanMessage = triggerMessage.includes('|') ? triggerMessage.split('|')[0] : triggerMessage;
       
+      console.log('🎯 Mensagem limpa:', cleanMessage);
+      
       if (!isChatStarted) {
-        handleStartChat(cleanMessage);
+        console.log('🚀 Iniciando chat...');
+        handleStartChat(cleanMessage).finally(() => {
+          processingMessageRef.current = false;
+        });
       } else {
-        handleNewMessage(cleanMessage);
+        console.log('💬 Enviando mensagem...');
+        handleNewMessage(cleanMessage).finally(() => {
+          processingMessageRef.current = false;
+        });
       }
+    } else {
+      console.log('❌ triggerMessage não processado:', { 
+        hasTrigger: !!triggerMessage, 
+        isNew: triggerMessage !== lastTriggerRef.current, 
+        isLoading: isLoadingSessionRef.current,
+        isProcessing: processingMessageRef.current,
+        conversationCreated: conversationCreatedRef.current
+      });
     }
   }, [triggerMessage]);
 
@@ -223,8 +246,16 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Iniciar chat (primeira mensagem)
   const handleStartChat = async (firstMessage: string) => {
-    console.log('🚀 handleStartChat iniciado:', { firstMessage, isAuthenticated, hasAuthChat: !!authChat });
+    console.log('🚀 handleStartChat iniciado:', { firstMessage, isAuthenticated, hasAuthChat: !!authChat, conversationCreated: conversationCreatedRef.current });
+    
+    // Prevent multiple conversation creation
+    if (conversationCreatedRef.current) {
+      console.log('⚠️ Conversa já criada, pulando criação...');
+      return;
+    }
+    
     setIsChatStarted(true);
+    conversationCreatedRef.current = true;
 
   // Create a temporary user message and show it instantly (UI-first).
   const tempUserMessage: ChatMessage = { id: Date.now().toString(), type: 'user', content: firstMessage, timestamp: new Date() };
@@ -446,6 +477,10 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     setPendingMessage(null);
     setCurrentSessionId(null);
   };  const resetChat = () => {
+    console.log('🔄 Resetando chat...');
+    conversationCreatedRef.current = false;
+    processingMessageRef.current = false;
+    lastTriggerRef.current = '';
     handleRestartChat();
   };
 
@@ -456,6 +491,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     isLoadingSessionRef.current = true;
     
     setIsChatStarted(true);
+    conversationCreatedRef.current = true; // Mark as conversation already exists
     setChatMessages(session.messages);
     setCurrentSessionId(session.id);
     setIsThinking(false);

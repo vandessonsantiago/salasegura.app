@@ -23,6 +23,8 @@ import {
   useAgendamentos,
   type ConsultaAgendada,
 } from "../../contexts/AgendamentosContext"
+import { useToast } from "@/components/ui/ToastProvider"
+import ConfirmDialog from "@/components/ui/ConfirmDialog"
 
 interface MeusAgendamentosModalProps {
   isOpen: boolean
@@ -36,6 +38,7 @@ export default function MeusAgendamentosModal({
   onAlterarAgendamento,
 }: MeusAgendamentosModalProps) {
   const { consultasAgendadas, removeConsulta, refresh } = useAgendamentos()
+  const { success, error } = useToast()
   const [selectedConsulta, setSelectedConsulta] =
     useState<ConsultaAgendada | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -43,6 +46,21 @@ export default function MeusAgendamentosModal({
     type: 'success' | 'error' | 'info'
     message: string
   } | null>(null)
+
+  // Estados para o dialog de confirmação
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning'
+  });
 
   // Auto-refresh a cada 30 segundos quando o modal está aberto
   useEffect(() => {
@@ -92,32 +110,39 @@ export default function MeusAgendamentosModal({
   }
 
   const handleCancelarConsulta = async (consultaId: string) => {
-    if (!confirm("Tem certeza que deseja cancelar este agendamento?")) {
-      return
+    const performCancel = async () => {
+      try {
+        setFeedbackMessage({ type: 'info', message: 'Cancelando agendamento...' })
+        await removeConsulta(consultaId)
+        success('Agendamento cancelado', 'O agendamento foi cancelado com sucesso.')
+        setFeedbackMessage({ type: 'success', message: 'Agendamento cancelado com sucesso!' })
+
+        // Limpar mensagem após 3 segundos
+        setTimeout(() => setFeedbackMessage(null), 3000)
+      } catch (err) {
+        console.error('Erro ao cancelar agendamento:', err)
+        error('Erro ao cancelar', 'Não foi possível cancelar o agendamento. Tente novamente.')
+        setFeedbackMessage({ type: 'error', message: 'Erro ao cancelar agendamento. Tente novamente.' })
+        setTimeout(() => setFeedbackMessage(null), 3000)
+      }
     }
 
-    try {
-      setFeedbackMessage({ type: 'info', message: 'Cancelando agendamento...' })
-      await removeConsulta(consultaId)
-      setFeedbackMessage({ type: 'success', message: 'Agendamento cancelado com sucesso!' })
-
-      // Limpar mensagem após 3 segundos
-      setTimeout(() => setFeedbackMessage(null), 3000)
-    } catch (error) {
-      console.error('Erro ao cancelar agendamento:', error)
-      setFeedbackMessage({
-        type: 'error',
-        message: 'Erro ao cancelar agendamento. Tente novamente.'
-      })
-
-      // Limpar mensagem após 5 segundos
-      setTimeout(() => setFeedbackMessage(null), 5000)
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Cancelar Agendamento',
+      message: 'Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.',
+      onConfirm: performCancel,
+      type: 'danger'
+    })
   }
 
   const handleAlterarAgendamento = (consulta: ConsultaAgendada) => {
     onAlterarAgendamento(consulta)
     onClose()
+  }
+
+  const handleConfirmDialogClose = () => {
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   }
 
   const handleReabrirPix = (consulta: ConsultaAgendada) => {
@@ -821,6 +846,19 @@ export default function MeusAgendamentosModal({
           </div>
         </div>
       )}
+
+      {/* Dialog de Confirmação */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={() => {
+          confirmDialog.onConfirm();
+          handleConfirmDialogClose();
+        }}
+        onCancel={handleConfirmDialogClose}
+        type={confirmDialog.type}
+      />
     </>
   )
 }

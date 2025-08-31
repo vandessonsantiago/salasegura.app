@@ -3,6 +3,7 @@ import CheckoutComponent from '../payments/CheckoutComponent';
 import { useDivorce } from '@/contexts/DivorceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDivorceCheckout } from '@/hooks/useSpecializedCheckout';
+import { useToast } from '@/components/ui/ToastProvider';
 
 interface DivorcioExpressModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(existingCaseId || null);
   const { updatePaymentInfo, currentCase, divorceCases, createCaseWithPayment } = useDivorce();
   const { user } = useAuth();
+  const toast = useToast();
 
   // ✅ CORREÇÃO: Memoizar initialData para consistência e prevenir problemas futuros
   const initialData = useMemo(() => ({
@@ -117,7 +119,7 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
               }
             }}
             onError={(errorMessage: string) => {
-              console.error('Erro no pagamento:', errorMessage);
+              toast.error('Erro no Pagamento', errorMessage);
             }}
             onCancel={() => {
               console.log('Pagamento cancelado');

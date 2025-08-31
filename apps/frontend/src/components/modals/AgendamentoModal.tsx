@@ -10,6 +10,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import CheckoutComponent from "../payments/CheckoutComponent"
 import { apiEndpoint } from "../../lib/api"
 import { useAppointmentCheckout } from "@/hooks/useSpecializedCheckout"
+import { useToast } from "@/components/ui/ToastProvider"
 
 // Helper para fazer requests para a API
 const api = {
@@ -94,6 +95,7 @@ export default function AgendamentoModal({
 
   const { addConsulta } = useAgendamentos()
   const { user } = useAuth()
+  const toast = useToast()
   // Atualizar telefone quando mudar - forçar re-render do hook
   const [checkoutKey, setCheckoutKey] = useState(0);
   useEffect(() => {
@@ -148,7 +150,7 @@ export default function AgendamentoModal({
       console.log("✅ Datas keys:", Object.keys(response.availableDates))
       setAvailableDates(response.availableDates)
     } catch (error) {
-      console.error("Erro ao buscar datas disponíveis:", error)
+      toast.error('Erro ao Carregar Datas', 'Não foi possível carregar as datas disponíveis. Tente novamente.')
       setAvailableDates({})
     } finally {
       setLoadingDates(false)
@@ -179,7 +181,7 @@ export default function AgendamentoModal({
         setAvailableSlots(slotsForDate)
         setAvailableSlotsDetailed(slotsDetailed)
       } catch (err) {
-        console.error("Erro ao buscar slots detalhados:", err)
+        toast.error('Erro ao Carregar Horários', 'Não foi possível carregar os horários disponíveis.')
         // Fallback: usar slots carregados pela busca de 15 dias
         const fallback = availableDates[date] || []
         setAvailableSlots(fallback)
@@ -320,7 +322,7 @@ export default function AgendamentoModal({
       // O agendamento será criado APÓS o processamento do pagamento
       setShowCheckout(true)
     } catch (error) {
-      console.error("Erro ao iniciar checkout:", error)
+      toast.error('Erro no Checkout', 'Erro ao iniciar checkout. Tente novamente.')
       setFeedbackMessage({
         type: 'error',
         message: 'Erro ao iniciar checkout. Tente novamente.'
@@ -394,7 +396,7 @@ export default function AgendamentoModal({
       }
 
     } catch (error) {
-      console.error("Erro ao processar agendamento:", error)
+      toast.error('Erro no Agendamento', 'Erro ao processar agendamento. Tente novamente.')
       setFeedbackMessage({
         type: 'error',
         message: 'Erro ao processar agendamento. Tente novamente.'
@@ -403,7 +405,7 @@ export default function AgendamentoModal({
   }
 
   const handleCheckoutError = (error: string) => {
-    console.error("Erro no checkout:", error)
+    toast.error('Erro no Pagamento', `Erro no pagamento: ${error}`)
     setFeedbackMessage({
       type: 'error',
       message: `Erro no pagamento: ${error}`

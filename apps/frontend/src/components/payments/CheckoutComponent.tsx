@@ -38,6 +38,7 @@ export default function CheckoutComponent({
     copyPastePix?: string;
     pixExpiresAt?: string;
     paymentId?: string;
+    caseId?: string; // 🔧 NOVO: Adicionar caseId para consistência
   };
   checkoutHook?: SpecializedCheckoutHook;
   initialCustomerData?: {

@@ -146,7 +146,7 @@ router.post('/', async (req: Request, res: Response) => {
       // Reconhecer todos os status válidos do Asaas que indicam pagamento concluído
       const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'];
       const recordStatus = completedStatuses.includes(payment.status)
-        ? 'CONFIRMED'
+        ? 'payment_received'  // 🔧 CORREÇÃO: Usar status válido para a constraint do banco
         : payment.status;
 
       const { error: updateError } = await supabaseAdmin
@@ -163,7 +163,7 @@ router.post('/', async (req: Request, res: Response) => {
         console.log(`✅ ${serviceType} ${agendamentoId} atualizado para ${recordStatus}`);
 
         // Se o agendamento/caso foi confirmado, criar evento no Google Calendar
-        if (recordStatus === 'CONFIRMED') {
+        if (recordStatus === 'payment_received') {
           try {
             // Primeiro tentar buscar na tabela agendamentos
             let agendamento = null;

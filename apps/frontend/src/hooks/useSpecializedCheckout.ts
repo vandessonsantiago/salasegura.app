@@ -16,6 +16,7 @@ export interface PixData {
   qrCode: string;
   copyPaste: string;
   expiresAt: string;
+  caseId?: string; // 🔧 NOVO: ID do caso criado pelo checkout
 }
 
 // Hook específico para checkout de divórcios
@@ -126,6 +127,7 @@ export function useDivorceCheckout(initialData?: {
           qrCode: json.qrCodePix || "",
           copyPaste: json.copyPastePix || "",
           expiresAt: json.pixExpiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          caseId: json.agendamentoId, // 🔧 NOVO: Capturar o caseId retornado pelo backend
         }
 
         // If backend didn't return usable pix, throw error instead of using placeholder

@@ -64,7 +64,7 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
             productDescription="Serviço de divórcio consensual simples e 100% guiado."
             customerId={user?.id || ''}
             checkoutHook={divorceCheckout}
-            onSuccess={async (paymentId: string, status: string, paymentData?: { qrCode?: string; copyPaste?: string }) => {
+            onSuccess={async (paymentId: string, status: string, paymentData?: { qrCode?: string; copyPaste?: string; caseId?: string }) => {
               console.log("✅ [FRONTEND] Pagamento processado com sucesso!");
               console.log("💳 [FRONTEND] Payment ID:", paymentId);
               console.log("📊 [FRONTEND] Status:", status);
@@ -80,8 +80,13 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
                     copyPastePix: paymentData.copyPaste || '',
                     pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
                   });
+                } else if (paymentData.caseId) {
+                  // 🔧 NOVO: Usar caseId retornado pelo checkout (não criar caso duplicado)
+                  console.log("📋 [FRONTEND] Usando caseId do checkout:", paymentData.caseId);
+                  setCurrentCaseId(paymentData.caseId);
                 } else {
-                  // Criar novo caso com dados completos
+                  // Fallback: Criar novo caso apenas se não houver caseId do checkout
+                  console.warn("⚠️ [FRONTEND] Checkout não retornou caseId, criando caso adicional");
                   const newCase = await createCaseWithPayment({
                     paymentId,
                     qrCodePix: paymentData.qrCode || '',
@@ -96,8 +101,8 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
 
                 // Se o pagamento foi confirmado, atualizar o status do caso
                 if (status === 'CONFIRMED' && currentCaseId) {
-                  // Aqui podemos adicionar lógica para atualizar o status do caso para 'payment_confirmed'
-                  console.log('Pagamento confirmado! Caso pode ser atualizado para payment_confirmed');
+                  // 🔧 CORREÇÃO: O webhook agora atualiza automaticamente para 'payment_received'
+                  console.log('Pagamento confirmado! Webhook atualizará caso para payment_received');
                 }
               }
 

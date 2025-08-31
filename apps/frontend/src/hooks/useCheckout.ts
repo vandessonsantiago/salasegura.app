@@ -16,7 +16,7 @@ export interface CheckoutComponentProps {
   productName: string;
   productDescription: string;
   customerId?: string;
-  onSuccess: (paymentId: string, status: string, pixData?: { qrCode?: string; copyPaste?: string }) => void;
+  onSuccess: (paymentId: string, status: string, pixData?: { qrCode?: string; copyPaste?: string; caseId?: string }) => void;
   onError?: (error: string) => void;
   onCancel?: () => void;
   initialCustomerData?: {
@@ -31,6 +31,7 @@ export interface PixData {
   qrCode: string;
   copyPaste: string;
   expiresAt: string;
+  caseId?: string; // 🔧 NOVO: ID do caso criado pelo checkout
 }
 
 // Hook simplificado sem props para uso geral

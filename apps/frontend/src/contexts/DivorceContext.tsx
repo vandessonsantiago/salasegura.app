@@ -80,7 +80,7 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
             id: case_.id,
             userId: case_.user_id,
             type: case_.type,
-            status: case_.status === 'CONFIRMED' ? 'payment_confirmed' : case_.status, // 🔧 CORREÇÃO: Mapear CONFIRMED para payment_confirmed
+            status: case_.status === 'payment_received' ? 'payment_confirmed' : case_.status, // 🔧 CORREÇÃO: Mapear payment_received para payment_confirmed
             paymentId: case_.payment_id,
             valor: parseFloat(case_.valor),
             createdAt: case_.created_at,
@@ -309,12 +309,12 @@ export function DivorceProvider({ children }: { children: ReactNode }) {
 
   // Verificar se há caso ativo
   const hasActiveCase = divorceCases.some(case_ =>
-    ['pending_payment', 'payment_confirmed', 'in_progress', 'CONFIRMED'].includes(case_.status)
+    ['pending_payment', 'payment_confirmed', 'in_progress', 'payment_received'].includes(case_.status)
   )
 
   // Obter caso atual (mais recente ativo)
   const currentCase = divorceCases.find(case_ =>
-    ['pending_payment', 'payment_confirmed', 'in_progress', 'CONFIRMED'].includes(case_.status)
+    ['pending_payment', 'payment_confirmed', 'in_progress', 'payment_received'].includes(case_.status)
   ) || null
 
   // Carregar dados na inicialização

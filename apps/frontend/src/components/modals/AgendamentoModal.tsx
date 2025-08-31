@@ -334,7 +334,7 @@ export default function AgendamentoModal({
   const handleCheckoutSuccess = async (
     paymentId: string,
     status: string,
-    pixData?: { qrCode?: string; copyPaste?: string }
+    pixData?: { qrCode?: string; copyPaste?: string; caseId?: string }
   ) => {
     console.log("Pagamento processado:", { paymentId, status, pixData })
 

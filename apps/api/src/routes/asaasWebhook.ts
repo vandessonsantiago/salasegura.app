@@ -153,7 +153,6 @@ router.post('/', async (req: Request, res: Response) => {
         .from(tableName)
         .update({
           status: recordStatus,
-          payment_status: payment.status,
           updated_at: new Date().toISOString()
         })
         .eq('id', agendamentoId);

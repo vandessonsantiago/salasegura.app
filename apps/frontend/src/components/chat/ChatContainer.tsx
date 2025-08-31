@@ -9,7 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ChatContainerProps {
   onChatStart?: (started: boolean) => void;
-  chatType?: 'juridico' | 'conversao';
+  onChatReset?: (reset: boolean) => void;
+  loadSession: (session: ChatSession) => void;
+  chatType: 'juridico' | 'conversao';
   triggerMessage?: string; // Nova prop para disparar mensagens
   isActive?: boolean; // Nova prop para controlar se o chat está ativo
 }
@@ -21,13 +23,14 @@ export interface ChatContainerRef {
   startChat: (message: string) => void;
 }
 
-const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, triggerMessage, chatType = 'conversao', isActive = true }, ref) => {
+const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChatStart, onChatReset, triggerMessage, chatType = 'conversao', isActive = true }, ref) => {
   const [isChatStarted, setIsChatStarted] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<ChatMessage | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isChatReset, setIsChatReset] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Log quando o componente é montado
@@ -259,6 +262,9 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
       console.log('⚠️ Conversa já criada, pulando criação...');
       return;
     }
+    
+    // Resetar flag de reset quando iniciar nova conversa
+    setIsChatReset(false);
     
     setIsChatStarted(true);
     conversationCreatedRef.current = true;
@@ -492,9 +498,12 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     lastTriggerRef.current = '';
     savingMessageRef.current = false;
     
-    // Notificar parent sobre mudança de estado
-    if (onChatStart) {
-      onChatStart(false);
+    // Marcar que o chat foi resetado
+    setIsChatReset(true);
+    
+    // Notificar parent sobre o reset
+    if (onChatReset) {
+      onChatReset(true);
     }
     
     console.log('✅ Chat reiniciado - pronto para nova conversa');
@@ -519,20 +528,34 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     lastTriggerRef.current = '';
     savingMessageRef.current = false;
     
-    // Notificar parent sobre mudança de estado
-    if (onChatStart) {
-      onChatStart(false);
+    // Marcar que o chat foi resetado
+    setIsChatReset(true);
+    
+    // Notificar parent sobre o reset
+    if (onChatReset) {
+      onChatReset(true);
     }
     
     console.log('✅ Chat resetado - pronto para nova conversa');
   };
 
   const loadSession = (session: ChatSession) => {
-    console.log('Loading session in ChatContainer:', session.id);
-    
+    console.log('🎯 ChatContainer.loadSession: INÍCIO DA FUNÇÃO - Recebendo sessão:', {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      messageCount: session.messages.length,
+      hasOnChatStart: !!onChatStart,
+      hasOnChatReset: !!onChatReset,
+      isChatStarted,
+      isChatReset
+    });
+
     // Prevent triggerMessage processing during session loading
     isLoadingSessionRef.current = true;
-    
+
+    // Resetar flag de reset quando carregar sessão
+    setIsChatReset(false);
+
     setIsChatStarted(true);
     conversationCreatedRef.current = true; // Mark as conversation already exists
     setChatMessages(session.messages);
@@ -541,12 +564,23 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     setIsTyping(false);
     setPendingMessage(null);
     savingMessageRef.current = false;
-    
+
+    console.log('✅ ChatContainer.loadSession: Sessão carregada com sucesso', {
+      messageCount: session.messages.length,
+      firstMessage: session.messages[0] ? {
+        id: session.messages[0].id,
+        type: session.messages[0].type,
+        content: session.messages[0].content?.substring(0, 50)
+      } : null
+    });
+
     // Notify parent
     if (onChatStart) {
+      console.log('📤 ChatContainer: Chamando onChatStart(true)...');
       onChatStart(true);
+      console.log('✅ ChatContainer: onChatStart chamado com sucesso');
     }
-    
+
     // Release the flag after a short delay
     setTimeout(() => {
       isLoadingSessionRef.current = false;
@@ -555,7 +589,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
 
   // Expor handleNewMessage, resetChat, loadSession e startChat via ref
   useImperativeHandle(ref, () => {
-    console.log('🔗 ChatContainer useImperativeHandle chamado');
+    console.log('🔗 ChatContainer useImperativeHandle chamado - expondo métodos');
     return {
       handleNewMessage,
       resetChat,
@@ -596,7 +630,43 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   );
 
   if (!isChatStarted || !isActive) {
-    console.log('❌ Chat não iniciado ou não ativo, exibindo div vazio', { isChatStarted, isActive });
+    console.log('❌ Chat não iniciado ou não ativo, exibindo div vazio', { isChatStarted, isActive, isChatReset });
+
+    // Se o chat foi resetado, mostrar o indicador visual em vez de div vazia
+    if (isChatReset) {
+      return (
+        <div className="flex-1 flex flex-col">
+          {/* Header do chat com opção de reiniciar */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Conversa</h3>
+            <button
+              onClick={handleRestartChat}
+              className="text-sm text-teal-600 hover:text-teal-700 underline transition-colors"
+              title="Limpar chat atual e iniciar uma nova conversa (conversa anterior ficará salva)"
+            >
+              🆕 Nova conversa
+            </button>
+          </div>
+
+          {/* Container do chat com scroll */}
+          <div className="flex-1 flex flex-col relative z-10">
+            <div className="flex-1 overflow-y-auto bg-white rounded-lg border border-gray-200 p-4 space-y-4 max-h-[60vh]">
+              {/* Indicador de chat vazio após reset */}
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-2xl">💬</span>
+                </div>
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Nova conversa iniciada</h4>
+                <p className="text-sm text-gray-600 max-w-sm">
+                  Sua conversa anterior foi salva. Digite uma mensagem para começar uma nova conversa.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Estado inicial - Vazio
     return (
       <div className="flex-1">

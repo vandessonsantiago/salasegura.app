@@ -34,8 +34,14 @@ export default function Header({
   };
 
   const handleLoadSession = (session: ChatSession) => {
-    console.log('🔄 Header.handleLoadSession chamado:', session);
+    console.log('🔄 Header.handleLoadSession chamado:', {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      messageCount: session.messages.length,
+      hasOnLoadSession: !!onLoadSession
+    });
     if (onLoadSession) {
+      console.log('📤 Header: Chamando onLoadSession...');
       onLoadSession(session);
       console.log('✅ Header: onLoadSession chamado com sucesso');
     } else {

@@ -107,14 +107,24 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
       sessionId: session.id,
       sessionTitle: session.title,
       messageCount: session.messages.length,
-      isAuthenticated
+      isAuthenticated,
+      hasOnLoadSession: !!onLoadSession
     });
-    
+
     if (isAuthenticated && session.id) {
       try {
         // Sempre buscar mensagens frescas do backend para garantir dados atualizados
-        console.log('📡 MessageModal: Buscando mensagens atualizadas do backend');
+        console.log('📡 MessageModal: Buscando mensagens atualizadas do backend para conversationId:', session.id);
         const messages = await authChat.fetchMessages(session.id);
+        console.log('📨 MessageModal: Mensagens recebidas do backend:', {
+          messageCount: messages.length,
+          firstMessage: messages[0] ? {
+            id: messages[0].id,
+            role: messages[0].role,
+            content: messages[0].content?.substring(0, 50)
+          } : null
+        });
+
         const loadedSession: ChatSession = {
           ...session,
           messages: messages.map((msg: any) => ({
@@ -124,12 +134,23 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
             timestamp: new Date(msg.created_at)
           }))
         };
-        console.log('✅ MessageModal: sessão carregada com mensagens:', loadedSession.messages.length);
-        
+        console.log('✅ MessageModal: sessão carregada com mensagens processadas:', {
+          sessionId: loadedSession.id,
+          messageCount: loadedSession.messages.length,
+          firstProcessedMessage: loadedSession.messages[0] ? {
+            id: loadedSession.messages[0].id,
+            type: loadedSession.messages[0].type,
+            content: loadedSession.messages[0].content?.substring(0, 50)
+          } : null
+        });
+
         if (onLoadSession) {
+          console.log('📤 MessageModal: Chamando onLoadSession...');
           onLoadSession(loadedSession);
           console.log('✅ MessageModal: onLoadSession chamado com sucesso');
           onClose();
+        } else {
+          console.error('❌ MessageModal: onLoadSession não está definido!');
         }
       } catch (error) {
         console.error('❌ MessageModal: Erro ao carregar mensagens:', error);

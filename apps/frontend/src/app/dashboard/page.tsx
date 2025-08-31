@@ -37,9 +37,18 @@ export default function DashboardPage() {
 
   // Função para carregar uma sessão do modal de conversas
   const handleLoadSession = (session: any) => {
-    console.log('🔄 Dashboard: Carregando sessão do modal:', session);
+    console.log('🔄 Dashboard: Carregando sessão do modal:', {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      messageCount: session.messages.length,
+      hasMainRef: !!mainRef.current
+    });
     if (mainRef.current) {
+      console.log('📤 Dashboard: Chamando mainRef.current.loadSession...');
       mainRef.current.loadSession(session);
+      console.log('✅ Dashboard: mainRef.current.loadSession chamado com sucesso');
+    } else {
+      console.log('❌ Dashboard: mainRef.current é null');
     }
   };
 

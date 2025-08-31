@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useChatStorage, ChatSession } from "@/hooks/useChatStorage";
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthenticatedChatStorage, AuthChatConversation } from '@/hooks/useAuthenticatedChatStorage';
+import { useToast } from './ToastProvider';
 
 interface MessageModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   const { user, session } = useAuth();
   const isAuthenticated = !!user && !!session?.access_token;
   const authChat = useAuthenticatedChatStorage(session?.access_token || "");
+  const { error: showError, success: showSuccess } = useToast();
 
   const {
     sessions: localSessions,
@@ -199,16 +201,17 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
       if (isAuthenticated) {
         try {
           setDeletingConversationId(sessionId);
-          const success = await authChat.deleteConversation(sessionId);
-          if (success) {
+          const deleteSuccess = await authChat.deleteConversation(sessionId);
+          if (deleteSuccess) {
             // Forçar refresh das conversas
             setRefreshTrigger(prev => prev + 1);
+            showSuccess('Conversa excluída', 'A conversa foi removida com sucesso.');
           } else {
-            alert('Erro ao excluir a conversa. Tente novamente.');
+            showError('Erro ao excluir conversa', 'Tente novamente.');
           }
-        } catch (error) {
-          console.error('Erro ao excluir conversa:', error);
-          alert('Erro ao excluir a conversa. Tente novamente.');
+        } catch (err) {
+          console.error('Erro ao excluir conversa:', err);
+          showError('Erro ao excluir conversa', 'Tente novamente.');
         } finally {
           setDeletingConversationId(null);
         }

@@ -3,6 +3,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ChecklistProvider } from "@/contexts/ChecklistContext";
 import { AgendamentosProvider } from "@/contexts/AgendamentosContext";
 import { DivorceProvider } from "@/contexts/DivorceContext";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import "./styles.css";
 
 const instrumentSans = Instrument_Sans({
@@ -22,7 +23,9 @@ export default function RootLayout({
           <ChecklistProvider>
             <AgendamentosProvider>
               <DivorceProvider>
-                {children}
+                <ToastProvider>
+                  {children}
+                </ToastProvider>
               </DivorceProvider>
             </AgendamentosProvider>
           </ChecklistProvider>

@@ -1,0 +1,94 @@
+'use client';
+
+import { useEffect } from 'react';
+import { CheckCircle, Warning, Info, XCircle, X } from '@phosphor-icons/react';
+
+export type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+export interface ToastProps {
+  id: string;
+  type: ToastType;
+  title: string;
+  message?: string;
+  duration?: number;
+  onClose: (id: string) => void;
+}
+
+const toastStyles = {
+  success: {
+    bg: 'bg-green-50',
+    border: 'border-green-200',
+    icon: 'text-green-400',
+    title: 'text-green-800',
+    message: 'text-green-700',
+    iconComponent: CheckCircle,
+  },
+  error: {
+    bg: 'bg-red-50',
+    border: 'border-red-200',
+    icon: 'text-red-400',
+    title: 'text-red-800',
+    message: 'text-red-700',
+    iconComponent: XCircle,
+  },
+  warning: {
+    bg: 'bg-yellow-50',
+    border: 'border-yellow-200',
+    icon: 'text-yellow-400',
+    title: 'text-yellow-800',
+    message: 'text-yellow-700',
+    iconComponent: Warning,
+  },
+  info: {
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
+    icon: 'text-blue-400',
+    title: 'text-blue-800',
+    message: 'text-blue-700',
+    iconComponent: Info,
+  },
+};
+
+export default function Toast({ id, type, title, message, duration = 5000, onClose }: ToastProps) {
+  const style = toastStyles[type];
+  const IconComponent = style.iconComponent;
+
+  useEffect(() => {
+    if (duration > 0) {
+      const timer = setTimeout(() => {
+        onClose(id);
+      }, duration);
+
+      return () => clearTimeout(timer);
+    }
+  }, [id, duration, onClose]);
+
+  return (
+    <div className={`max-w-sm w-full ${style.bg} border ${style.border} rounded-lg p-4 shadow-lg transform transition-all duration-300 ease-in-out`}>
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          <IconComponent className={`h-6 w-6 ${style.icon}`} />
+        </div>
+        <div className="ml-3 w-0 flex-1 pt-0.5">
+          <p className={`text-sm font-medium ${style.title}`}>
+            {title}
+          </p>
+          {message && (
+            <p className={`mt-1 text-sm ${style.message}`}>
+              {message}
+            </p>
+          )}
+        </div>
+        <div className="ml-4 flex-shrink-0 flex">
+          <button
+            className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${style.title} hover:bg-black hover:bg-opacity-5 transition-colors`}
+            onClick={() => onClose(id)}
+          >
+            <span className="sr-only">Fechar</span>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

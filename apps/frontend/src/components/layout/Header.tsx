@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Logo, MessageModal } from "@/components/ui";
 import { ChatSession } from "@/hooks/useChatStorage";
 
@@ -7,7 +8,7 @@ interface HeaderProps {
   // Landing page props
   onResetChat?: () => void;
   onLoadSession?: (session: ChatSession) => void;
-  // Dashboard props  
+  // Dashboard props
   showUserMenu?: boolean;
   UserMenuComponent?: React.ComponentType;
   onResetDashboard?: () => void; // Nova prop para resetar dashboard
@@ -15,22 +16,20 @@ interface HeaderProps {
   className?: string;
 }
 
-export default function Header({ 
-  onResetChat, 
-  onLoadSession, 
+export default function Header({
+  onResetChat,
+  onLoadSession,
   showUserMenu = false,
   UserMenuComponent,
   onResetDashboard,
   className = ""
 }: HeaderProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const router = useRouter();
 
   const handleLogoClick = () => {
-    if (onResetChat) {
-      onResetChat();
-    } else if (onResetDashboard) {
-      onResetDashboard();
-    }
+    // Sempre navegar para a página inicial (main hero)
+    router.push('/');
   };
 
   const handleLoadSession = (session: ChatSession) => {
@@ -63,7 +62,7 @@ export default function Header({
                 <Logo />
               )}
             </div>
-            
+
             <div className="flex space-x-4 items-center">
               {/* Ícone para abrir o modal de conversas salvas */}
               <button

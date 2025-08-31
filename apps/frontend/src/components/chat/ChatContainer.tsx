@@ -307,8 +307,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
                       type: 'assistant', 
                       content: assistantResp.response, 
                       timestamp: new Date(), 
-                      conversionData: assistantResp.conversionData || undefined,
-                      alreadySaved: true // Mark as already saved by ChatService
+                      conversionData: assistantResp.conversionData || undefined
                     });
                 setIsTyping(true);
                 // Atualizar conversationId se retornado pela API
@@ -331,8 +330,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
                       type: 'assistant', 
                       content: assistantResp.response, 
                       timestamp: new Date(), 
-                      conversionData: assistantResp.conversionData || undefined,
-                      alreadySaved: true // Mark as already saved by ChatService
+                      conversionData: assistantResp.conversionData || undefined
                     });
                     setIsTyping(true);
                     // Atualizar conversationId se retornado pela API
@@ -358,8 +356,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
               type: 'assistant', 
               content: assistantResp.response, 
               timestamp: new Date(), 
-              conversionData: assistantResp.conversionData || undefined,
-              alreadySaved: true // Mark as already saved by ChatService
+              conversionData: assistantResp.conversionData || undefined
             });
             setIsTyping(true);
             // Atualizar conversationId se retornado pela API
@@ -442,8 +439,7 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
           type: 'assistant',
           content: response.response,
           timestamp: new Date(),
-          conversionData: response.conversionData || undefined,
-          alreadySaved: true // Mark as already saved by ChatService
+          conversionData: response.conversionData || undefined
         });
         setIsTyping(true);
         // Atualizar conversationId se retornado pela API

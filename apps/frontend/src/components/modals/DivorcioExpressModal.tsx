@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CheckoutComponent from '../payments/CheckoutComponent';
 import { useDivorce } from '@/contexts/DivorceContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,11 +15,15 @@ export default function DivorcioExpressModal({ isOpen, onClose, existingCaseId }
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(existingCaseId || null);
   const { updatePaymentInfo, currentCase, divorceCases, createCaseWithPayment } = useDivorce();
   const { user } = useAuth();
-  const divorceCheckout = useDivorceCheckout({
+
+  // ✅ CORREÇÃO: Memoizar initialData para consistência e prevenir problemas futuros
+  const initialData = useMemo(() => ({
     name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
     email: user?.email || "",
     phone: user?.user_metadata?.phone || "",
-  });
+  }), [user?.user_metadata?.full_name, user?.email, user?.user_metadata?.phone]);
+
+  const divorceCheckout = useDivorceCheckout(initialData);
 
   console.log("🎯 [FRONTEND] DivorcioExpressModal inicializado");
   console.log("📥 [FRONTEND] existingCaseId:", existingCaseId);

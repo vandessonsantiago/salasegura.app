@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { CalendarIcon } from "@phosphor-icons/react"
 import {
   useAgendamentos,
@@ -103,11 +103,14 @@ export default function AgendamentoModal({
     }
   }, [clienteTelefone]);
 
-  const appointmentCheckout = useAppointmentCheckout({
+  // ✅ CORREÇÃO: Memoizar initialData para evitar loop infinito no useEffect
+  const initialData = useMemo(() => ({
     name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Cliente",
     email: user?.email || "",
     phone: clienteTelefone || "",
-  }, checkoutKey);
+  }), [user?.user_metadata?.full_name, user?.email, clienteTelefone]);
+
+  const appointmentCheckout = useAppointmentCheckout(initialData, checkoutKey);
 
   // 🔧 CORREÇÃO: Criar wrapper para o hook que inclui dados do slot selecionado
   const appointmentCheckoutWithSlotData = {

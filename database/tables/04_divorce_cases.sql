@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS divorce_cases (
   service_data jsonb DEFAULT '{}',
   CONSTRAINT divorce_cases_pkey PRIMARY KEY (id),
   CONSTRAINT divorce_cases_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id),
-  CONSTRAINT divorce_cases_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(id),
   CONSTRAINT divorce_cases_type_check CHECK (type IN ('traditional', 'express', 'consensual')),
   CONSTRAINT divorce_cases_status_check CHECK (status IN ('pending_payment', 'payment_received', 'in_progress', 'completed', 'cancelled'))
 );
@@ -38,7 +37,6 @@ CREATE INDEX IF NOT EXISTS idx_divorce_cases_user_id ON divorce_cases(user_id);
 CREATE INDEX IF NOT EXISTS idx_divorce_cases_cliente_email ON divorce_cases(cliente_email);
 CREATE INDEX IF NOT EXISTS idx_divorce_cases_cliente_telefone ON divorce_cases(cliente_telefone);
 CREATE INDEX IF NOT EXISTS idx_divorce_cases_status ON divorce_cases(status);
-CREATE INDEX IF NOT EXISTS idx_divorce_cases_payment_id ON divorce_cases(payment_id);
 
 -- RLS Policies for divorce_cases table
 ALTER TABLE divorce_cases ENABLE ROW LEVEL SECURITY;

@@ -21,8 +21,7 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT payments_pkey PRIMARY KEY (id),
-  CONSTRAINT payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id),
-  CONSTRAINT payments_divorce_case_id_fkey FOREIGN KEY (divorce_case_id) REFERENCES divorce_cases(id)
+  CONSTRAINT payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- Indexes for payments table
@@ -30,7 +29,6 @@ CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_payments_asaas_id ON payments(asaas_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at);
-CREATE INDEX IF NOT EXISTS idx_payments_divorce_case_id ON payments(divorce_case_id);
 
 -- RLS Policies for payments table
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;

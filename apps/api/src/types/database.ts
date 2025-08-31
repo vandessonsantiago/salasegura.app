@@ -75,6 +75,29 @@ export interface Database {
           updated_at?: string;
         };
       };
+      user_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_token: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_token: string;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          session_token?: string;
+          expires_at?: string;
+          created_at?: string;
+        };
+      };
       conversions: {
         Row: {
           id: string;
@@ -105,6 +128,123 @@ export interface Database {
           status?: string;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      divorce_cases: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          status: string;
+          payment_id: string | null;
+          valor: number;
+          cliente_nome: string | null;
+          cliente_email: string | null;
+          cliente_telefone: string | null;
+          cliente_cpf: string | null;
+          conjuge_nome: string | null;
+          conjuge_email: string | null;
+          conjuge_telefone: string | null;
+          conjuge_cpf: string | null;
+          created_at: string;
+          updated_at: string;
+          expires_at: string | null;
+          qr_code_pix: string | null;
+          copy_paste_pix: string | null;
+          pix_expires_at: string | null;
+          service_data: any;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type?: string;
+          status?: string;
+          payment_id?: string | null;
+          valor?: number;
+          cliente_nome?: string | null;
+          cliente_email?: string | null;
+          cliente_telefone?: string | null;
+          cliente_cpf?: string | null;
+          conjuge_nome?: string | null;
+          conjuge_email?: string | null;
+          conjuge_telefone?: string | null;
+          conjuge_cpf?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          expires_at?: string | null;
+          qr_code_pix?: string | null;
+          copy_paste_pix?: string | null;
+          pix_expires_at?: string | null;
+          service_data?: any;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          status?: string;
+          payment_id?: string | null;
+          valor?: number;
+          cliente_nome?: string | null;
+          cliente_email?: string | null;
+          cliente_telefone?: string | null;
+          cliente_cpf?: string | null;
+          conjuge_nome?: string | null;
+          conjuge_email?: string | null;
+          conjuge_telefone?: string | null;
+          conjuge_cpf?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          expires_at?: string | null;
+          qr_code_pix?: string | null;
+          copy_paste_pix?: string | null;
+          pix_expires_at?: string | null;
+          service_data?: any;
+        };
+      };
+      chat_conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          role?: string;
+          content?: string;
+          created_at?: string;
         };
       };
       checklist_sessions: {
@@ -359,6 +499,22 @@ export interface Database {
 // =====================================================
 // TIPOS DE RESPOSTA DAS QUERIES
 // =====================================================
+
+export type DivorceCase = Database['public']['Tables']['divorce_cases']['Row'];
+export type DivorceCaseInsert = Database['public']['Tables']['divorce_cases']['Insert'];
+export type DivorceCaseUpdate = Database['public']['Tables']['divorce_cases']['Update'];
+
+export type ChatConversation = Database['public']['Tables']['chat_conversations']['Row'];
+export type ChatConversationInsert = Database['public']['Tables']['chat_conversations']['Insert'];
+export type ChatConversationUpdate = Database['public']['Tables']['chat_conversations']['Update'];
+
+export type ChatMessage = Database['public']['Tables']['chat_messages']['Row'];
+export type ChatMessageInsert = Database['public']['Tables']['chat_messages']['Insert'];
+export type ChatMessageUpdate = Database['public']['Tables']['chat_messages']['Update'];
+
+export type UserSession = Database['public']['Tables']['user_sessions']['Row'];
+export type UserSessionInsert = Database['public']['Tables']['user_sessions']['Insert'];
+export type UserSessionUpdate = Database['public']['Tables']['user_sessions']['Update'];
 
 export type User = Database['public']['Tables']['users']['Row'];
 export type UserInsert = Database['public']['Tables']['users']['Insert'];

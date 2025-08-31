@@ -50,6 +50,12 @@ psql $DATABASE_URL -f "$DB_DIR/11_user_profiles.sql"
 echo "🔐 Creating user_sessions table..."
 psql $DATABASE_URL -f "$DB_DIR/12_user_sessions.sql"
 
+echo "🔗 Adding foreign key constraints..."
+psql $DATABASE_URL -c "ALTER TABLE payments ADD CONSTRAINT payments_divorce_case_id_fkey FOREIGN KEY (divorce_case_id) REFERENCES divorce_cases(id);"
+psql $DATABASE_URL -c "ALTER TABLE divorce_cases ADD CONSTRAINT divorce_cases_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES payments(id);"
+psql $DATABASE_URL -c "CREATE INDEX IF NOT EXISTS idx_payments_divorce_case_id ON payments(divorce_case_id);"
+psql $DATABASE_URL -c "CREATE INDEX IF NOT EXISTS idx_divorce_cases_payment_id ON divorce_cases(payment_id);"
+
 echo "🎉 All tables created successfully!"
 echo ""
 echo "📝 Next steps:"

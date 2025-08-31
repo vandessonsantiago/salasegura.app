@@ -5,6 +5,7 @@ import { useChatStorage, ChatSession } from "@/hooks/useChatStorage";
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthenticatedChatStorage, AuthChatConversation } from '@/hooks/useAuthenticatedChatStorage';
 import { useToast } from './ToastProvider';
+import ConfirmDialog from './ConfirmDialog';
 
 interface MessageModalProps {
   isOpen: boolean;
@@ -31,6 +32,21 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
   const [isClearingAll, setIsClearingAll] = useState(false);
+
+  // Estados para o dialog de confirmação
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning'
+  });
 
   // Filtrar sessões baseado na busca
   useEffect(() => {
@@ -195,9 +211,25 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
     }
   };
 
+  // Função helper para mostrar dialog de confirmação
+  const showConfirmDialog = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'warning' | 'info' = 'warning') => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type
+    });
+  };
+
+  const handleConfirmDialogClose = () => {
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+  };
+
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    if (confirm('Tem certeza que deseja excluir esta conversa?')) {
+
+    const performDelete = async () => {
       if (isAuthenticated) {
         try {
           setDeletingConversationId(sessionId);
@@ -218,11 +250,18 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
       } else {
         deleteLocalSession(sessionId);
       }
-    }
+    };
+
+    showConfirmDialog(
+      'Excluir Conversa',
+      'Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.',
+      performDelete,
+      'danger'
+    );
   };
 
   const clearAllSessions = async () => {
-    if (confirm('Tem certeza que deseja limpar todas as conversas?')) {
+    const performClearAll = async () => {
       if (isAuthenticated) {
         try {
           setIsClearingAll(true);
@@ -232,15 +271,25 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
           }
           // Forçar refresh das conversas
           setRefreshTrigger(prev => prev + 1);
+          showSuccess('Conversas limpas', 'Todas as conversas foram removidas com sucesso.');
         } catch (error) {
           console.error('Erro ao limpar conversas do banco de dados:', error);
+          showError('Erro ao limpar conversas', 'Tente novamente.');
         } finally {
           setIsClearingAll(false);
         }
       } else {
         clearAllLocalSessions();
+        showSuccess('Conversas limpas', 'Todas as conversas locais foram removidas.');
       }
-    }
+    };
+
+    showConfirmDialog(
+      'Limpar Todas as Conversas',
+      'Tem certeza que deseja limpar todas as conversas? Esta ação não pode ser desfeita.',
+      performClearAll,
+      'danger'
+    );
   };
 
   const formatDate = (date: Date) => {
@@ -357,6 +406,19 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
           )}
         </div>
       </div>
+
+      {/* Dialog de Confirmação */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={() => {
+          confirmDialog.onConfirm();
+          handleConfirmDialogClose();
+        }}
+        onCancel={handleConfirmDialogClose}
+        type={confirmDialog.type}
+      />
     </div>
   );
 }

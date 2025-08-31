@@ -274,30 +274,27 @@ export interface Database {
       webhook_logs: {
         Row: {
           id: string;
-          asaas_event: string;
+          event_type: string;
           payment_id: string | null;
           payload: any;
           processed_at: string;
           status: string;
-          error_message: string | null;
         };
         Insert: {
           id?: string;
-          asaas_event: string;
+          event_type: string;
           payment_id?: string | null;
           payload: any;
           processed_at?: string;
           status?: string;
-          error_message?: string | null;
         };
         Update: {
           id?: string;
-          asaas_event?: string;
+          event_type?: string;
           payment_id?: string | null;
           payload?: any;
           processed_at?: string;
           status?: string;
-          error_message?: string | null;
         };
       };
       app_settings: {

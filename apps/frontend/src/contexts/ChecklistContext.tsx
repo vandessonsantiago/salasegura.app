@@ -22,7 +22,8 @@ export interface ChecklistItem {
   item_id: string;
   category: string;
   text: string;
-  checked: boolean;
+  title: string;
+  completed: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,7 @@ const ChecklistContext = createContext<ChecklistContextType | undefined>(undefin
 async function authFetch(path: string, token: string, init?: RequestInit) {
   const base = CHECKLIST_BASE; // http://.../api/v1/checklist
   const url = path.startsWith('/') ? `${base}${path}` : `${base}/${path}`;
+  console.log('🌐 authFetch:', { url, method: init?.method || 'GET', hasToken: !!token });
   const res = await fetch(url, {
     ...init,
     headers: {
@@ -60,11 +62,15 @@ async function authFetch(path: string, token: string, init?: RequestInit) {
       ...(init?.headers || {})
     }
   });
+  console.log('📡 Resposta recebida:', { status: res.status, ok: res.ok });
   if (!res.ok) {
     const text = await res.text();
+    console.error('❌ Erro na resposta:', { status: res.status, text });
     throw new Error(text || res.statusText);
   }
-  return res.json();
+  const json = await res.json();
+  console.log('✅ Dados recebidos:', json);
+  return json;
 }
 
 export function ChecklistProvider({ children }: { children: ReactNode }) {
@@ -90,13 +96,21 @@ export function ChecklistProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadSessions = useCallback(async () => {
-    if (!token) return;
+    console.log('🔍 ChecklistContext.loadSessions chamado, token:', !!token);
+    if (!token) {
+      console.log('❌ Nenhum token disponível');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
+      console.log('📡 Fazendo requisição para /sessions...');
       const data = await authFetch('/sessions', token);
+      console.log('✅ Resposta recebida:', data);
       setSessions(data.sessions || []);
+      console.log('📋 Sessões atualizadas:', (data.sessions || []).length);
     } catch (e: any) {
+      console.error('❌ Erro ao carregar sessões:', e);
       setError('Erro ao carregar sessões');
     } finally {
       setLoading(false);
@@ -104,17 +118,24 @@ export function ChecklistProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const loadSession = useCallback(async (sessionId: string) => {
-    if (!token) return null;
+    console.log('🔍 ChecklistContext.loadSession chamado:', { sessionId, token: !!token });
+    if (!token) {
+      console.log('❌ Nenhum token disponível');
+      return null;
+    }
     setLoading(true);
     setError(null);
     try {
+      console.log('📡 Fazendo requisição para /sessions/' + sessionId + '...');
       const data = await authFetch(`/sessions/${sessionId}`, token);
+      console.log('✅ Sessão carregada:', data.session?.id, 'itens:', data.session?.items?.length);
       setCurrentSession(data.session);
       return data.session;
     } catch (e: any) {
-      console.error('Erro ao carregar sessão:', e);
+      console.error('❌ Erro ao carregar sessão:', e);
       // Se a sessão não for encontrada, não definir erro para permitir fallback
       if (e.message?.includes('not found') || e.message?.includes('404')) {
+        console.log('⚠️ Sessão não encontrada (404), retornando null');
         return null;
       }
       setError('Erro ao carregar sessão');
@@ -125,17 +146,21 @@ export function ChecklistProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const createSession = useCallback(async () => {
+    console.log('🔍 ChecklistContext.createSession chamado, token:', !!token);
     if (!token) return null;
     setLoading(true);
     setError(null);
     try {
+      console.log('📡 Fazendo requisição POST para /sessions...');
       const data = await authFetch('/sessions', token, { method: 'POST', body: JSON.stringify({}) });
+      console.log('✅ Sessão criada:', data.session);
       const session = data.session as ChecklistSessionWithItems;
       // Atualiza lista e sessão atual
       setSessions(prev => [session, ...prev]);
       setCurrentSession(session);
       return session;
     } catch (e: any) {
+      console.error('❌ Erro ao criar sessão:', e);
       setError('Erro ao criar sessão');
       return null;
     } finally {
@@ -149,7 +174,7 @@ export function ChecklistProvider({ children }: { children: ReactNode }) {
     try {
       const data = await authFetch(`/sessions/${sessionId}/items/${itemId}`, token, {
         method: 'PUT',
-        body: JSON.stringify({ checked })
+        body: JSON.stringify({ completed: checked })
       });
 
       const updated = data.session as ChecklistSessionWithItems;

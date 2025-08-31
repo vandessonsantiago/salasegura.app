@@ -115,10 +115,23 @@ export class DivorceService {
     try {
       console.log('🔄 [DIVORCE] Atualizando caso com dados PIX:', caseId);
 
+      // Primeiro, encontrar o registro de pagamento pelo asaas_id
+      const { data: paymentRecord, error: findError } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('asaas_id', paymentData.paymentId)
+        .single();
+
+      if (findError || !paymentRecord) {
+        console.error('❌ [DIVORCE] Pagamento não encontrado:', findError);
+        return { success: false, error: 'Pagamento não encontrado' };
+      }
+
+      // Agora atualizar o caso com o ID interno do pagamento (UUID)
       const { error } = await supabase
         .from('divorce_cases')
         .update({
-          payment_id: paymentData.paymentId,
+          payment_id: paymentRecord.id, // Usar o UUID interno, não o asaas_id
           qr_code_pix: paymentData.qrCodePix,
           copy_paste_pix: paymentData.copyPastePix,
           pix_expires_at: paymentData.pixExpiresAt,

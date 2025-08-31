@@ -217,10 +217,22 @@ export class AgendamentoService {
         paymentStatus: paymentData.paymentStatus
       });
 
+      // Primeiro, encontrar o registro de pagamento pelo asaas_id
+      const { data: paymentRecord, error: findError } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('asaas_id', paymentData.paymentId)
+        .single();
+
+      if (findError || !paymentRecord) {
+        console.error('❌ [AGENDAMENTO] Pagamento não encontrado:', findError);
+        return { success: false, error: 'Pagamento não encontrado' };
+      }
+
       const { error } = await supabase
         .from('agendamentos')
         .update({
-          payment_id: paymentData.paymentId,
+          payment_id: paymentRecord.id, // Usar o UUID interno, não o asaas_id
           payment_status: paymentData.paymentStatus,
           qr_code_pix: paymentData.qrCodePix,
           copy_paste_pix: paymentData.copyPastePix,

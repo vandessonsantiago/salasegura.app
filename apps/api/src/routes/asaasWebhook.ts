@@ -26,7 +26,7 @@ router.post('/', async (req: Request, res: Response) => {
       .from('webhook_logs')
       .select('id, status, created_at')
       .eq('payment_id', payment.id)
-      .eq('asaas_event', event)
+      .eq('event_type', event)
       .order('created_at', { ascending: false })
       .limit(5);
 
@@ -63,11 +63,18 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Log do webhook no banco para auditoria
+    // Primeiro, encontrar o registro de pagamento pelo asaas_id
+    const { data: webhookPaymentRecord } = await supabaseAdmin
+      .from('payments')
+      .select('id')
+      .eq('asaas_id', payment.id)
+      .single();
+
     await supabaseAdmin
       .from('webhook_logs')
       .insert({
-        asaas_event: event,
-        payment_id: payment.id,
+        event_type: event,
+        payment_id: webhookPaymentRecord?.id || null, // Usar o UUID interno, não o asaas_id
         payload: req.body,
         status: 'received'
       })
@@ -283,11 +290,10 @@ router.post('/', async (req: Request, res: Response) => {
       await supabaseAdmin
         .from('webhook_logs')
         .insert({
-          asaas_event: req.body?.event || 'unknown',
+          event_type: req.body?.event || 'unknown',
           payment_id: req.body?.payment?.id || 'unknown',
           payload: req.body || {},
-          status: 'error',
-          error_message: error instanceof Error ? error.message : 'Erro desconhecido'
+          status: 'error'
         })
         .then(({ error: logError }: { error: any }) => {
           if (logError) console.error('Erro ao salvar log de erro:', logError);

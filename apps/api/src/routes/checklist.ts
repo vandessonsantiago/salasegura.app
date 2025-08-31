@@ -49,9 +49,9 @@ router.get('/sessions/:id', authenticateToken, async (req: Request, res: Respons
 router.put('/sessions/:id/items/:itemId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { checked } = req.body;
-    if (typeof checked !== 'boolean') return res.status(400).json({ error: 'checked boolean required' });
-    const updated = await ChecklistService.updateItem(userId, req.params.id, req.params.itemId, checked);
+    const { completed } = req.body;
+    if (typeof completed !== 'boolean') return res.status(400).json({ error: 'completed boolean required' });
+    const updated = await ChecklistService.updateItem(userId, req.params.id, req.params.itemId, completed);
     res.json({ session: updated });
   } catch (error: any) {
     if (error.message === 'Session not found' || error.message === 'Item not found') {

@@ -69,34 +69,56 @@ export default function ChecklistModal({ isOpen, onClose }: ChecklistModalProps)
   }, [currentSession, loadSession]);
 
   const handleToggleItem = async (itemId: string) => {
-    if (!currentSession || loading) return;
-
-    // Encontrar o item usando o ID correto
-    const item = localItems.find(i => i.id === itemId);
-    if (!item) {
-      console.warn('Item não encontrado:', itemId);
+    console.log('🔄 handleToggleItem chamado com:', itemId, typeof itemId);
+    if (!currentSession || loading) {
+      console.log('❌ Retornando: sessão não existe ou está carregando');
       return;
     }
 
-    const newChecked = !item.checked;
+    // Primeiro tentar encontrar pelo item_id (string)
+    let item = localItems.find(i => i.item_id === itemId);
+    if (!item) {
+      // Se não encontrou, tentar pelo id (UUID)
+      item = localItems.find(i => i.id === itemId);
+      console.log('⚠️ Item encontrado pelo id (UUID) em vez de item_id:', item?.item_id);
+    }
+
+    if (!item) {
+      console.warn('❌ Item não encontrado:', itemId);
+      console.log('📋 Itens disponíveis:', localItems.map(i => ({ id: i.id, item_id: i.item_id, text: i.text?.substring(0, 30) })));
+      return;
+    }
+
+    console.log('✅ Item encontrado:', { id: item.id, item_id: item.item_id, text: item.text?.substring(0, 50), completed: item.completed });
+
+    const newChecked = !item.completed;
 
     // Atualização otimista do estado local
-    setLocalItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: newChecked } : it));
+    setLocalItems(prev => prev.map(it =>
+      it.item_id === item.item_id ? { ...it, completed: newChecked } : it
+    ));
 
     try {
       // Tentar atualizar no servidor
+      console.log('📡 Enviando atualização para servidor:', { sessionId: currentSession.id, itemId: item.item_id, newChecked });
       const success = await updateItem(currentSession.id, item.item_id, newChecked);
 
       if (!success) {
         // Se falhou, reverter a mudança local e tentar sincronizar
-        console.warn('Falha ao atualizar item no servidor, revertendo e sincronizando');
-        setLocalItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: !newChecked } : it));
+        console.warn('⚠️ Falha ao atualizar item no servidor, revertendo e sincronizando');
+        setLocalItems(prev => prev.map(it =>
+          it.item_id === item.item_id ? { ...it, completed: !newChecked } : it
+        ));
         await syncWithServer();
+      } else {
+        console.log('✅ Item atualizado com sucesso no servidor');
       }
     } catch (error) {
       // Em caso de erro, reverter a mudança local e sincronizar
-      console.error('Erro ao atualizar item:', error);
-      setLocalItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: !newChecked } : it));
+      console.error('❌ Erro ao atualizar item:', error);
+      setLocalItems(prev => prev.map(it =>
+        it.item_id === item.item_id ? { ...it, completed: !newChecked } : it
+      ));
       await syncWithServer();
     }
   };
@@ -217,17 +239,17 @@ export default function ChecklistModal({ isOpen, onClose }: ChecklistModalProps)
                       </h3>
                       <div className="space-y-3">
                         {items.map(item => (
-                          <div key={`item-${item.id}-${item.checked}`} className="flex items-start gap-4">
+                          <div key={`item-${item.id}-${item.completed}`} className="flex items-start gap-4">
                             <button
                               onClick={() => handleToggleItem(item.id)}
                               disabled={loading}
                               className={`flex-shrink-0 w-5 h-5 rounded border-2 transition-all duration-200 ${
-                                item.checked
+                                item.completed
                                   ? 'bg-blue-600 border-blue-600'
                                   : 'border-gray-300 hover:border-blue-400'
                               } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
-                              {item.checked && (
+                              {item.completed && (
                                 <svg className="w-full h-full text-white" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>

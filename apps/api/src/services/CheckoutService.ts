@@ -267,14 +267,20 @@ export class CheckoutService {
       // Criar cliente no Asaas
       let customerId: string;
       try {
+        const customerData: any = {
+          name: cliente.name,
+          email: cliente.email,
+          cpfCnpj: cliente.cpfCnpj,
+        };
+
+        // Adicionar telefone apenas se estiver definido e não vazio
+        if (cliente.phone && cliente.phone.trim() !== "") {
+          customerData.phone = cliente.phone;
+        }
+
         const customerResponse = await axios.post(
           `${CheckoutService.ASAAS_CONFIG.BASE_URL}/customers`,
-          {
-            name: cliente.name,
-            email: cliente.email,
-            cpfCnpj: cliente.cpfCnpj,
-            phone: cliente.phone || "", // 🔧 CORREÇÃO: Usar string vazia se phone for undefined
-          },
+          customerData,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -347,7 +353,7 @@ export class CheckoutService {
             asaas_id: paymentId,
             status: 'PENDING',
             valor: valor,
-            user_id: userId || 'feaa14ea-17d9-4772-947b-ca4d59be2158', // Usar userId passado ou valor padrão
+            user_id: userId || 'ac963a9a-57b0-4996-8d2b-1d70faf5564d', // Usar userId passado ou usuário válido existente
             agendamento_id: referenceId,
             created_at: new Date().toISOString(),
           });

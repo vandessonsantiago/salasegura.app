@@ -422,6 +422,17 @@ export class AgendamentoService {
         .limit(1)
         .single();
 
+      console.log('🔍 [SERVICE] Query result:', {
+        hasData: !!data,
+        hasError: !!error,
+        errorCode: error?.code,
+        dataKeys: data ? Object.keys(data) : null,
+        google_meet_link: data?.google_meet_link,
+        calendar_event_id: data?.calendar_event_id,
+        status: data?.status,
+        payment_status: data?.payment_status
+      });
+
       if (error && error.code !== 'PGRST116') { // PGRST116 = not found
         return { success: false, error: error.message };
       }

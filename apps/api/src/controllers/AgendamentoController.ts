@@ -130,6 +130,16 @@ export class AgendamentoController {
 
       const resultado = await AgendamentoService.buscarAgendamentoUsuario(userId);
 
+      console.log('🔍 [API] Resultado da busca:', {
+        success: resultado.success,
+        hasAgendamento: !!resultado.agendamento,
+        agendamentoKeys: resultado.agendamento ? Object.keys(resultado.agendamento) : null,
+        google_meet_link: resultado.agendamento?.google_meet_link,
+        calendar_event_id: resultado.agendamento?.calendar_event_id,
+        status: resultado.agendamento?.status,
+        payment_status: resultado.agendamento?.payment_status
+      });
+
       if (!resultado.success) {
         res.status(404).json({
           success: false,
@@ -141,6 +151,15 @@ export class AgendamentoController {
       res.json({
         success: true,
         data: resultado.agendamento
+      });
+
+      console.log('📤 [API] Response enviada:', {
+        success: true,
+        dataKeys: resultado.agendamento ? Object.keys(resultado.agendamento) : null,
+        googleMeetLink: resultado.agendamento?.google_meet_link,
+        calendarEventId: resultado.agendamento?.calendar_event_id,
+        status: resultado.agendamento?.status,
+        paymentStatus: resultado.agendamento?.payment_status
       });
     } catch (error) {
       console.error('Erro no controlador buscarAgendamentoUsuario:', error);

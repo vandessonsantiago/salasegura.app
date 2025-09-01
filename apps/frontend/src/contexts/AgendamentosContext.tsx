@@ -85,18 +85,22 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         console.log("📡 [LOAD] Buscando agendamentos do backend...")
         try {
           const result = await authJsonFetch(
-            "/agendamento",
+            "/agendamento-new/meu-agendamento",
             session.access_token,
             { method: 'GET' }
           )
           console.log("📥 [LOAD] Resposta bruta do backend:", result)
 
           if (result && result.success && result.data) {
-            console.log(`📊 [LOAD] ${result.data.length} agendamentos encontrados no backend`)
+            console.log(`📊 [LOAD] Agendamento encontrado no backend`)
+
+            // Verificar se result.data é um array ou um único objeto
+            const dataArray = Array.isArray(result.data) ? result.data : [result.data];
+            console.log(`📊 [LOAD] ${dataArray.length} agendamentos encontrados no backend`)
 
             // Verificar dados PIX do primeiro item
-            if (result.data.length > 0) {
-              const firstItem = result.data[0]
+            if (dataArray.length > 0) {
+              const firstItem = dataArray[0]
               console.log("🔍 [LOAD] Primeiro item - dados PIX:", {
                 id: firstItem.id,
                 qr_code_pix: firstItem.qr_code_pix ? "PRESENTE" : "AUSENTE",
@@ -127,7 +131,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               googleMeetLink?: string  // Fix: Backend sends camelCase, not snake_case
             }
 
-            const consultasConvertidas = (result.data as BackendConsulta[]).map(
+            const consultasConvertidas = (dataArray as BackendConsulta[]).map(
               (item) => {
                 // Mapeamento de status do backend para o frontend
                 const mapBackendStatus = (backendStatus: string, paymentStatus: string): ConsultaAgendada["status"] => {
@@ -336,9 +340,12 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
       // Fazer chamada para o backend para excluir do banco
       if (session?.access_token) {
         const result = await authJsonFetch(
-          `/agendamento/${id}`,
+          `/agendamento-new/cancelar`,
           session.access_token,
-          { method: 'DELETE' }
+          { 
+            method: 'POST',
+            body: JSON.stringify({ agendamentoId: id })
+          }
         )
 
         if (!result || !result.success) {
@@ -491,7 +498,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         console.log('🔄 [POLLING] Verificando atualizações de status...')
 
         const result = await authJsonFetch(
-          "/agendamento",
+          "/agendamento-new/meu-agendamento",
           session.access_token,
           { method: 'GET' }
         )
@@ -499,8 +506,12 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         if (result && result.success && result.data) {
           // Verificar se houve mudanças nos status
           let hasChanges = false
+          
+          // Garantir que result.data seja tratado como array
+          const dataArray = Array.isArray(result.data) ? result.data : [result.data]
+          
           const updatedConsultas = consultasAgendadas.map(existing => {
-            const backendItem = result.data.find((item: any) => item.id === existing.id)
+            const backendItem = dataArray.find((item: any) => item.id === existing.id)
             if (backendItem) {
               // Verificar se o status mudou
               const currentStatus = existing.status
@@ -525,6 +536,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   qrCodePix: backendItem.qr_code_pix,
                   copyPastePix: backendItem.copy_paste_pix,
                   pixExpiresAt: backendItem.pix_expires_at,
+                  googleMeetLink: backendItem.google_meet_link || existing.googleMeetLink,
                 }
               }
 
@@ -537,6 +549,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   qrCodePix: backendItem.qr_code_pix,
                   copyPastePix: backendItem.copy_paste_pix,
                   pixExpiresAt: backendItem.pix_expires_at,
+                  googleMeetLink: backendItem.google_meet_link || existing.googleMeetLink,
                 }
               }
             }

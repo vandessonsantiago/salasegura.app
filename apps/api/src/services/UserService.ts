@@ -76,8 +76,18 @@ export class UserService {
 
       if (error) throw error;
 
+      // Debug: verificar estrutura dos dados retornados
+      console.log('👤 [USER] Dados brutos do usuário:', {
+        id: user?.id,
+        name: user?.name,
+        email: user?.email,
+        profile: user?.profile,
+        fullUser: user
+      });
+
       return user;
     } catch (error) {
+      console.error('❌ [USER] Erro ao buscar usuário:', error);
       throw new Error(`Failed to get user by id: ${error}`);
     }
   }

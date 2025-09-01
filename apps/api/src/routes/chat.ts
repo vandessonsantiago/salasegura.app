@@ -243,6 +243,12 @@ router.post('/', async (req, res) => {
     const authHeader = req.headers?.authorization;
     const isAuthenticatedRequest = !!authHeader && authHeader.startsWith('Bearer ');
 
+    console.log('🔐 [CHAT] Verificação de autenticação:', {
+      hasAuthHeader: !!authHeader,
+      isAuthenticatedRequest,
+      authHeaderPreview: authHeader ? authHeader.substring(0, 20) + '...' : null
+    });
+
     let userId = null;
     let currentConversationId = conversationId;
     let userContext = null;
@@ -251,16 +257,28 @@ router.post('/', async (req, res) => {
     if (isAuthenticatedRequest) {
       try {
         const token = authHeader.replace('Bearer ', '');
+        console.log('🔑 [CHAT] Token extraído, fazendo validação...');
+
         const { data: { user }, error } = await supabase.auth.getUser(token);
+        
+        console.log('👤 [CHAT] Resultado da validação do token:', {
+          hasUser: !!user,
+          userId: user?.id,
+          hasError: !!error,
+          errorMessage: error?.message
+        });
+        
         if (error || !user) {
           console.warn('⚠️ Token inválido para usuário autenticado');
         } else {
           userId = user.id;
+          console.log('✅ [CHAT] Usuário autenticado com sucesso:', userId);
           userContext = await UserContextService.getUserContext(userId);
-          console.log('� [CHAT] Contexto do usuário obtido:', {
+          console.log('🧠 [CHAT] Contexto do usuário obtido:', {
             hasProfile: !!userContext?.userProfile,
             appointmentsCount: userContext?.activeAppointments?.length || 0,
-            casesCount: userContext?.divorceCases?.length || 0
+            casesCount: userContext?.divorceCases?.length || 0,
+            profileName: userContext?.userProfile?.name
           });
 
           // Se não há conversationId, buscar ou criar uma conversa ativa
@@ -314,9 +332,9 @@ router.post('/', async (req, res) => {
     // Gerar resposta usando IA contextual
     const aiResponse = await ChatAIService.generateResponse(message, userContext);
 
-    // Enriquecer resposta com informações legais se relevante
+    // Enriquecer resposta com informações legais se relevante (apenas se não houver referência legal na resposta da IA)
     let finalResponse = aiResponse;
-    if (hasLegalContext) {
+    if (hasLegalContext && !aiResponse.includes('💡 Base Legal:')) {
       const legalInfo = legalResults[0].data;
       const legalAddition = `\n\n💡 **Referência Legal:** ${legalInfo.legislation || 'Consulte legislação específica'}`;
       finalResponse += legalAddition;

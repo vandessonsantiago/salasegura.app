@@ -338,7 +338,7 @@ Pergunta: ${message}`;
     // Adicionando timestamp para forçar cache novo após mudanças no prompt
     const baseKey = message.toLowerCase().trim().substring(0, 100);
     const contextKey = userContext ? 'authenticated' : 'anonymous';
-    const versionKey = 'v2.6'; // Versão do cache para forçar atualização
+    const versionKey = 'v2.9'; // Versão do cache para forçar atualização - implementação respostas sobre consultas agendadas
     return `chat:${contextKey}:${versionKey}:${baseKey}`;
   }
 

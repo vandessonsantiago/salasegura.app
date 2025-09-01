@@ -196,13 +196,6 @@ export default function MessageBlock({
           {formatTime(message.timestamp)}
         </div>
 
-        {/* Indicador de conversão se houver */}
-        {message.conversionData?.shouldConvert && (
-          <div className="mt-3 p-2 bg-teal-50 border border-teal-200 rounded text-xs text-teal-700">
-            💡 Esta mensagem indica interesse em nossos serviços
-          </div>
-        )}
-
         {/* Ícones de ação */}
         {showActions && (
           <div 

@@ -23,6 +23,8 @@ interface ChatResponse {
   };
   conversionData: ConversionData | null;
   conversationId?: string;
+  showAccessForm?: boolean;
+  componentToShow?: string;
 }
 
 // Versão da API: v1
@@ -62,10 +64,28 @@ export class ChatService {
       const data: ChatResponse = await response.json();
       console.log('✅ Resposta recebida da API:', { 
         responseLength: data.response.length, 
-        hasConversion: !!data.conversionData 
+        hasConversion: !!data.conversionData,
+        showAccessForm: data.showAccessForm,
+        componentToShow: data.componentToShow
       });
       
-      return data;
+      // Mapear os novos campos para conversionData se necessário
+      let finalConversionData = data.conversionData;
+      if (data.showAccessForm && data.componentToShow === 'ContactForm' && !finalConversionData) {
+        finalConversionData = {
+          shouldConvert: true,
+          contactData: {
+            email: '',
+            whatsapp: ''
+          },
+          timestamp: new Date().toISOString()
+        };
+      }
+      
+      return {
+        ...data,
+        conversionData: finalConversionData
+      };
     } catch (error) {
       console.error('❌ Erro ao enviar mensagem:', error);
       throw new Error('Falha na comunicação com o servidor');

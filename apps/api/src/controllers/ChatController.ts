@@ -162,7 +162,7 @@ export class ChatController {
 			const legalInfo = LegalService.searchLegalInfo(message);
 
 			// Gerar resposta usando IA contextual
-			const aiResponse = await ChatAIService.generateResponse(message, userContext);
+			const aiResponse = await ChatAIService.generateResponse(message, userContext, ChatAIService.getDefaultSystemPrompt());
 
 			// Adicionar informações legais se relevante
 			let enhancedResponse = aiResponse;

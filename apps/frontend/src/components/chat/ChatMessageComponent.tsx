@@ -33,12 +33,6 @@ export default function ChatMessageComponent({ message, isTyping = false }: Chat
             {message.content}
           </div>
           
-          {/* Mostrar indicador de conversão se houver */}
-          {!isUser && message.conversionData?.shouldConvert && (
-            <div className="mt-2 p-2 bg-teal-50 border border-teal-200 rounded text-xs text-teal-700">
-              💡 Esta mensagem pode indicar interesse em nossos serviços
-            </div>
-          )}
         </div>
         
         <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>

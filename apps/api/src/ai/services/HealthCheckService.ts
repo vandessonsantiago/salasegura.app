@@ -144,7 +144,7 @@ export class HealthCheckService {
     if (FeatureFlags.isEnabled('AI_CHAT')) {
       try {
         const testMessage = 'Olá, sou um teste do sistema de saúde';
-        const response = await ChatAIService.generateResponse(testMessage, null);
+        const response = await ChatAIService.generateResponse(testMessage, null, ChatAIService.getDefaultSystemPrompt());
         results.tests.push({
           test: 'AI Response Generation',
           status: response && response.length > 0 ? 'pass' : 'fail',

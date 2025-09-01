@@ -11,6 +11,8 @@ import dashboardChatRoutes from "./routes/dashboardChat";
 import checklistRoutes from "./routes/checklist";
 import { errorHandler } from "./middleware/errorHandler";
 import { requestLogger } from "./middleware/requestLogger";
+import { MetricsService } from "./ai/services/MetricsService";
+import { ChatAIService } from "./ai/services/ChatAIService";
 
 export const createApp = (): express.Express => {
   const app = express();
@@ -54,6 +56,10 @@ export const createApp = (): express.Express => {
 
   // Middleware de tratamento de erros (deve ser o último)
   app.use(errorHandler);
+
+  // Inicializar serviços
+  ChatAIService.initialize();
+  MetricsService.initialize().catch(console.error);
 
   return app;
 };

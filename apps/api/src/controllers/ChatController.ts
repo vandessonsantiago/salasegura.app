@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin as supabase } from '../lib/supabase';
+import { ChatAIService } from '../ai/services/ChatAIService';
+import { UserContextService } from '../ai/services/UserContextService';
+import { LegalService } from '../legal/services/LegalService';
 
 export class ChatController {
 	// Buscar todas as conversas do usuário autenticado
@@ -88,7 +91,7 @@ export class ChatController {
 	static async addMessage(req: Request, res: Response) {
 		const userId = req.user?.id;
 		const conversationId = req.params.id;
-		const { sender, content } = req.body;
+		const { sender = 'user', content } = req.body; // sender opcional com valor padrão
 		
 		if (!userId) {
 			return res.status(401).json({ success: false, error: 'Usuário não autenticado' });
@@ -127,6 +130,144 @@ export class ChatController {
 		}
 		
 		return res.status(201).json({ success: true, data });
+	}
+
+	// Processar mensagem com IA contextual
+	static async processMessage(req: Request, res: Response) {
+		try {
+			const { message, chatHistory = [] } = req.body;
+			const userId = req.user?.id;
+
+			// Validação básica de entrada
+			if (!message || typeof message !== 'string' || message.trim().length === 0) {
+				return res.status(400).json({
+					success: false,
+					error: 'Mensagem é obrigatória e deve ser uma string não vazia'
+				});
+			}
+
+			console.log('📝 [CHAT] Processando mensagem:', {
+				userId,
+				messageLength: message.length,
+				chatHistoryLength: chatHistory.length
+			});
+
+			// Buscar contexto do usuário se autenticado
+			let userContext = null;
+			if (userId) {
+				userContext = await UserContextService.getUserContext(userId);
+			}
+
+			// Verificar se é uma pergunta jurídica específica
+			const legalInfo = LegalService.searchLegalInfo(message);
+
+			// Gerar resposta usando IA contextual
+			const aiResponse = await ChatAIService.generateResponse(message, userContext);
+
+			// Adicionar informações legais se relevante
+			let enhancedResponse = aiResponse;
+			if (legalInfo.length > 0 && legalInfo[0].relevance > 0.7) {
+				const legalContext = `\n\n💡 **Informação Jurídica Relevante:**\n${legalInfo[0].data.title}\n${legalInfo[0].data.description || ''}`;
+				enhancedResponse += legalContext;
+			}
+
+			// Salvar mensagem no histórico se usuário autenticado
+			if (userId) {
+				await this.saveMessage(userId, 'user', message);
+				await this.saveMessage(userId, 'assistant', enhancedResponse);
+			}
+
+			res.json({
+				success: true,
+				response: enhancedResponse,
+				legalContext: legalInfo.length > 0 ? legalInfo[0] : null,
+				userContext: userContext ? {
+					hasAppointments: userContext.activeAppointments.length > 0,
+					hasCases: userContext.divorceCases.length > 0,
+					conversationsCount: userContext.chatHistory.length
+				} : null
+			});
+
+		} catch (error) {
+			console.error('❌ [CHAT] Erro ao processar mensagem:', error);
+
+			// Tentar resposta de fallback mesmo em caso de erro
+			let fallbackResponse = 'Olá! Sou o advogado Vandesson Santiago. Como posso ajudar com sua questão jurídica?';
+
+			try {
+				// Se for erro de IA, tentar resposta sem contexto
+				if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('API'))) {
+					fallbackResponse = 'Desculpe, estou com dificuldades técnicas no momento. Você pode reformular sua pergunta ou tentar novamente em alguns instantes?';
+				}
+			} catch (fallbackError) {
+				console.warn('⚠️ [CHAT] Erro ao gerar resposta de fallback:', fallbackError);
+			}
+
+			res.status(500).json({
+				success: false,
+				error: 'Erro interno do servidor',
+				fallback: fallbackResponse
+			});
+		}
+	}
+
+	// Método auxiliar para salvar mensagens
+	private static async saveMessage(userId: string, role: string, content: string) {
+		try {
+			// Validar parâmetros
+			if (!userId || !role || !content) {
+				console.warn('⚠️ [CHAT] Parâmetros inválidos para salvar mensagem:', { userId, role, contentLength: content?.length });
+				return;
+			}
+
+			// Buscar conversa ativa do usuário ou criar uma nova
+			let { data: conversations } = await supabase
+				.from('chat_conversations')
+				.select('id')
+				.eq('user_id', userId)
+				.order('updated_at', { ascending: false })
+				.limit(1);
+
+			let conversationId: string;
+
+			if (!conversations || conversations.length === 0) {
+				// Criar nova conversa se não existir
+				const { data: newConv, error: createErr } = await supabase
+					.from('chat_conversations')
+					.insert({
+						user_id: userId,
+						title: `Conversa ${new Date().toLocaleDateString('pt-BR')}`
+					})
+					.select('id')
+					.single();
+
+				if (createErr || !newConv) {
+					console.warn('⚠️ [CHAT] Erro ao criar conversa:', createErr);
+					return;
+				}
+
+				conversationId = newConv.id;
+			} else {
+				conversationId = conversations[0].id;
+			}
+
+			// Salvar mensagem
+			const { error: insertErr } = await supabase
+				.from('chat_messages')
+				.insert({
+					conversation_id: conversationId,
+					role,
+					content
+				});
+
+			if (insertErr) {
+				console.warn('⚠️ [CHAT] Erro ao salvar mensagem:', insertErr);
+			} else {
+				console.log('✅ [CHAT] Mensagem salva com sucesso');
+			}
+		} catch (error) {
+			console.warn('⚠️ [CHAT] Erro ao salvar mensagem:', error);
+		}
 	}
 
 	// Deletar uma conversa

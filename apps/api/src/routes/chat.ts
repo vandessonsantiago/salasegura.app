@@ -3,25 +3,15 @@ import OpenAI from 'openai';
 import { ChatController } from '../controllers/ChatController';
 import { authenticateToken } from '../middleware/auth';
 import { supabaseAdmin as supabase } from '../lib/supabase';
+import { ChatAIService } from '../ai/services/ChatAIService';
+import { UserContextService } from '../ai/services/UserContextService';
+import { LegalService } from '../legal/services/LegalService';
+import { HealthCheckService } from '../ai/services/HealthCheckService';
 
 const router: Router = express.Router();
 
-// Inicializar OpenAI com validação
-let openai: OpenAI | null = null;
-
-try {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (apiKey && apiKey.length > 20 && apiKey.startsWith('sk-')) {
-    openai = new OpenAI({
-      apiKey: apiKey,
-    });
-    console.log('✅ OpenAI inicializado com sucesso');
-  } else {
-    console.warn('⚠️ Chave da API OpenAI não configurada ou inválida');
-  }
-} catch (error) {
-  console.error('❌ Erro ao inicializar OpenAI:', error);
-}
+// Inicializar serviços de IA
+ChatAIService.initialize();
 
 interface ChatMessage {
   id: string;
@@ -255,8 +245,9 @@ router.post('/', async (req, res) => {
 
     let userId = null;
     let currentConversationId = conversationId;
+    let userContext = null;
 
-    // Se autenticado, extrair userId do token e gerenciar conversa
+    // Se autenticado, buscar contexto do usuário
     if (isAuthenticatedRequest) {
       try {
         const token = authHeader.replace('Bearer ', '');
@@ -265,7 +256,12 @@ router.post('/', async (req, res) => {
           console.warn('⚠️ Token inválido para usuário autenticado');
         } else {
           userId = user.id;
-          console.log('🔒 Usuário autenticado:', userId);
+          userContext = await UserContextService.getUserContext(userId);
+          console.log('� [CHAT] Contexto do usuário obtido:', {
+            hasProfile: !!userContext?.userProfile,
+            appointmentsCount: userContext?.activeAppointments?.length || 0,
+            casesCount: userContext?.divorceCases?.length || 0
+          });
 
           // Se não há conversationId, buscar ou criar uma conversa ativa
           if (!currentConversationId) {
@@ -298,10 +294,6 @@ router.post('/', async (req, res) => {
               }
             }
           }
-
-          // Remover salvamento automático da mensagem do usuário
-          // O ChatContainer cuidará disso para evitar duplicação
-          console.log('� Mensagem do usuário será salva pelo ChatContainer no frontend');
         }
       } catch (authError) {
         console.error('❌ Erro na autenticação:', authError);
@@ -309,211 +301,107 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Declarar variável finalResponse
-    let finalResponse: string;
-    let completion: any = null;
-    const shouldConvert = isAuthenticatedRequest ? { shouldConvert: false, contactData: { email: '', whatsapp: '' } } : detectConversionIntent(message, chatHistory);
-    const contactData = extractContactData(message);
+    // Verificar se é uma pergunta jurídica específica
+    const legalResults = LegalService.searchLegalInfo(message);
+    const hasLegalContext = legalResults.length > 0 && legalResults[0].relevance > 0.6;
 
-    // Adicionando logs detalhados para diagnóstico
-    console.log('🔍 Diagnóstico de Requisição:', {
-      isAuthenticatedRequest,
-      message,
-      chatHistoryLength: chatHistory.length,
+    console.log('⚖️ [CHAT] Análise jurídica:', {
+      hasLegalContext,
+      topResult: legalResults[0]?.topic,
+      relevance: legalResults[0]?.relevance
     });
 
-    if (!isAuthenticatedRequest) {
-      const conversionIntent = detectConversionIntent(message, chatHistory);
-      console.log('🔍 Resultado de detectConversionIntent:', conversionIntent);
-    } else {
-      console.log('🔒 Requisição autenticada - ignorando detecção de conversão');
+    // Gerar resposta usando IA contextual
+    const aiResponse = await ChatAIService.generateResponse(message, userContext);
+
+    // Enriquecer resposta com informações legais se relevante
+    let finalResponse = aiResponse;
+    if (hasLegalContext) {
+      const legalInfo = legalResults[0].data;
+      const legalAddition = `\n\n💡 **Referência Legal:** ${legalInfo.legislation || 'Consulte legislação específica'}`;
+      finalResponse += legalAddition;
     }
 
-    // Validando resultado de shouldConvert
-    console.log('🔍 Estado de shouldConvert:', shouldConvert);
-
-    // Construir mensagens para OpenAI
-    const messages = buildMessages({ message, chatHistory });
-
-    // Ajustando lógica para usar OpenAI com prompts específicos para cada contexto
-    let openAIPrompt;
-
-    if (!isAuthenticatedRequest) {
-      console.log('🔓 Requisição não autenticada - ajustando prompt para conversão');
-      openAIPrompt = `Você é um assistente especializado em guiar usuários para conversões. Responda de forma acolhedora e incentive o preenchimento do formulário para que possamos oferecer suporte adequado. Mensagem do usuário: "${message}"`;
-    } else {
-      console.log('🔒 Requisição autenticada - ajustando prompt para contexto jurídico');
-      openAIPrompt = `Você é um assistente jurídico especializado em direito de família. Responda de forma técnica e clara às questões apresentadas pelo usuário. Mensagem do usuário: "${message}"`;
-    }
-
-    console.log('🤖 Chamando OpenAI com prompt:', openAIPrompt);
-
-    // Verificar se OpenAI está disponível
-    if (!openai) {
-      console.warn('⚠️ OpenAI não disponível, usando resposta de fallback');
-      finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. Como posso ajudar com sua questão jurídica hoje?';
-    } else {
-      try {
-        // Chamar API da OpenAI com o prompt ajustado
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'system', content: openAIPrompt }],
-          max_tokens: 400,
-          temperature: 0.6,
-        });
-
-        finalResponse =
-          completion.choices[0]?.message?.content ||
-          'Desculpe, não consegui processar sua mensagem.';
-
-        console.log('✅ Resposta da OpenAI:', finalResponse.substring(0, 100) + '...');
-      } catch (error: any) {
-        console.error('❌ Erro na API OpenAI:', error.message);
-
-        // Tratamento específico para erro de API key
-        if (error.status === 401 || error.code === 'invalid_api_key') {
-          console.error('🔑 Chave da API OpenAI inválida ou expirada');
-          finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. No momento, estou com uma dificuldade técnica, mas posso ajudar com questões básicas sobre divórcio, guarda de filhos e pensão alimentícia. Que dúvida você tem?';
-        } else {
-          finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. Como posso ajudar com sua questão jurídica hoje?';
-        }
+    // Adicionar sugestões personalizadas baseadas no contexto
+    if (userContext) {
+      const suggestions = generatePersonalizedSuggestions(userContext);
+      if (suggestions.length > 0) {
+        finalResponse += '\n\n💡 **Sugestões baseadas no seu perfil:**\n' +
+          suggestions.map(s => `• ${s}`).join('\n');
       }
     }
 
-    // Adicionando lógica para identificar mensagens que precisam de respostas jurídicas
-    const isLegalContext = (message: string): boolean => {
-      const legalKeywords = ['divórcio', 'alimentos', 'direito de família', 'guarda', 'pensão'];
-      return legalKeywords.some((keyword) => message.toLowerCase().includes(keyword));
-    };
-
-    // Verificar se a mensagem é de contexto jurídico
-    const isLegalMessage = isLegalContext(message);
-
-    // Ajustando lógica para priorizar conversão em chats não autenticados
-    if (!isAuthenticatedRequest) {
-      console.log('🔓 Requisição não autenticada - restaurando fluxo de conversão');
-
-      const conversionResponse = await detectConversionIntent(message, chatHistory);
-
-      if (conversionResponse.shouldConvert) {
-        console.log('🎯 Fluxo de conversão acionado');
-        finalResponse = `Entendemos que este é um momento importante para você. Para ajudar, criamos um espaço digital chamado Sala Segura, onde você pode organizar e simplificar processos relacionados à sua situação. Por favor, preencha o formulário que aparecerá em seguida para que possamos oferecer o suporte necessário.`;
-      } else {
-        console.log('🔄 Mensagem genérica - chamando OpenAI para resposta ajustada');
-        if (!openai) {
-          console.warn('⚠️ OpenAI não disponível, usando resposta de fallback');
-          finalResponse = 'Olá! Sou o advogado Vandesson Santiago, especialista em direito de família. Como posso ajudar com sua questão jurídica hoje?';
-        } else {
-          const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'system', content: `Você é um assistente especializado em guiar usuários para conversões. Responda de forma acolhedora e incentive o preenchimento do formulário. Mensagem do usuário: "${message}"` }],
-            max_tokens: 400,
-            temperature: 0.6,
+    // Salvar no histórico se usuário autenticado
+    if (userId && currentConversationId) {
+      try {
+        // Salvar mensagem do usuário
+        await supabase
+          .from('chat_messages')
+          .insert({
+            conversation_id: currentConversationId,
+            role: 'user',
+            content: message
           });
 
-          finalResponse =
-            completion.choices[0]?.message?.content ||
-            'Desculpe, não consegui processar sua mensagem.';
-        }
-      }
-    } else if (isAuthenticatedRequest) {
-      console.log('🔒 Requisição autenticada - verificando contexto da mensagem');
+        // Salvar resposta da IA
+        await supabase
+          .from('chat_messages')
+          .insert({
+            conversation_id: currentConversationId,
+            role: 'assistant',
+            content: finalResponse
+          });
 
-      if (message.toLowerCase().includes('como essa página pode me ajudar')) {
-        console.log('⚖️ Mensagem genérica identificada - fornecendo contexto jurídico');
-        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
-      } else if (isLegalMessage) {
-        console.log('⚖️ Mensagem identificada como contexto jurídico');
-        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
-      } else {
-        console.log('❌ Não detectou conversão, usando resposta da OpenAI');
-        // ...existing OpenAI response logic...
+        console.log('💾 [CHAT] Mensagens salvas na conversa:', currentConversationId);
+      } catch (saveError) {
+        console.error('❌ [CHAT] Erro ao salvar mensagens:', saveError);
+        // Não falhar a resposta por erro de salvamento
       }
     }
-
-    // Restaurando fluxo de qualificação e apresentação para chat não autenticado
-    if (!isAuthenticatedRequest) {
-      console.log('🔓 Requisição não autenticada - iniciando fluxo de qualificação');
-
-      const qualificationQuestions = [
-        'Qual é o tipo de vínculo que você possui (casamento ou união estável)?',
-        'Existem filhos menores envolvidos?'
-      ];
-
-      if (chatHistory.length < qualificationQuestions.length) {
-        finalResponse = qualificationQuestions[chatHistory.length];
-      } else {
-        console.log('🎯 Qualificação concluída - apresentando aplicação');
-        finalResponse = `Entendemos que este é um momento importante para você. Para ajudar, criamos um espaço digital chamado Sala Segura, onde você pode organizar e simplificar processos relacionados à sua situação. Por favor, preencha o formulário que aparecerá em seguida para que possamos oferecer o suporte necessário.`;
-
-        // Simulando envio do formulário no chat
-        // Ajustando o tipo do formulário para corresponder à interface ChatMessage
-        const formMessage: ChatMessage = {
-          id: Date.now().toString(),
-          content: 'Aqui está o formulário de acesso: [Formulário de Acesso](#)',
-          type: 'assistant', // Corrigido para usar apenas propriedades válidas
-          timestamp: new Date()
-        };
-        chatHistory.push(formMessage);
-      }
-    } else if (isAuthenticatedRequest) {
-      console.log('🔒 Requisição autenticada - verificando contexto da mensagem');
-
-      if (message.toLowerCase().includes('como essa página pode me ajudar')) {
-        console.log('⚖️ Mensagem genérica identificada - fornecendo contexto jurídico');
-        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
-      } else if (isLegalMessage) {
-        console.log('⚖️ Mensagem identificada como contexto jurídico');
-        finalResponse = `Este é um assistente jurídico especializado em direito de família. Estou aqui para ajudar com questões relacionadas a divórcio, guarda de filhos, pensão alimentícia e outros temas jurídicos. Por favor, me diga como posso ajudar.`;
-      } else {
-        console.log('❌ Não detectou conversão, usando resposta da OpenAI');
-        // ...existing OpenAI response logic...
-      }
-    }
-
-    // Adicionando log para verificar resposta final
-    console.log('📤 Resposta final gerada:', {
-      finalResponse: finalResponse.substring(0, 100), // Limitar tamanho do log
-      shouldConvert: shouldConvert.shouldConvert,
-      conversionData: shouldConvert.shouldConvert ? contactData : null,
-    });
 
     const responseData = {
       response: finalResponse,
-      usage: completion?.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      conversionData: shouldConvert.shouldConvert
-        ? {
-            shouldConvert: true,
-            contactData,
-            timestamp: new Date().toISOString(),
-          }
-        : null,
-      conversationId: currentConversationId, // Incluir ID da conversa na resposta
+      legalContext: hasLegalContext ? legalResults[0] : null,
+      userContext: userContext ? {
+        hasAppointments: userContext.activeAppointments.length > 0,
+        hasCases: userContext.divorceCases.length > 0,
+        conversationsCount: userContext.chatHistory.length
+      } : null,
+      suggestions: userContext ? generatePersonalizedSuggestions(userContext) : [],
+      conversationId: currentConversationId
     };
 
-    // Remover salvamento automático da resposta do assistente
-    // O ChatContainer cuidará disso para evitar duplicação
-    console.log('� Resposta gerada, ChatContainer salvará no frontend');
-
-    console.log('📤 Enviando resposta:', {
-      responseLength: finalResponse.length,
-      shouldConvert: shouldConvert.shouldConvert,
-      usage: completion?.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-    });
-
+    console.log('✅ [CHAT] Resposta gerada com sucesso');
     res.json(responseData);
-  } catch (error) {
-    console.error('❌ Erro na API:', error);
 
+  } catch (error) {
+    console.error('❌ [CHAT] Erro no processamento:', error);
     res.status(500).json({
-      response:
-        'Desculpe, estou enfrentando uma dificuldade técnica no momento. Por favor, tente novamente em alguns instantes.',
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      conversionData: null,
-      error: error instanceof Error ? error.message : 'Erro desconhecido',
+      response: 'Olá! Sou o advogado Vandesson Santiago. Como posso ajudar com sua questão jurídica hoje?',
+      error: 'Erro interno do servidor'
     });
   }
 });
+
+// Função auxiliar para gerar sugestões personalizadas
+function generatePersonalizedSuggestions(userContext: any): string[] {
+  const suggestions = [];
+
+  if (userContext.activeAppointments?.length === 0 && userContext.divorceCases?.length > 0) {
+    suggestions.push('Considere agendar uma consulta para discutir seu caso em andamento');
+  }
+
+  if (userContext.divorceCases?.some((c: any) => c.hasMinors) &&
+      !userContext.chatHistory?.some((h: any) => h.content.includes('guarda'))) {
+    suggestions.push('Informações sobre guarda de filhos podem ser úteis para seu caso');
+  }
+
+  if (userContext.activeAppointments?.length > 0) {
+    suggestions.push('Você tem consultas agendadas - posso ajudar com dúvidas específicas');
+  }
+
+  return suggestions;
+}
 
 /**
  * GET /api/chat - Status da API de chat
@@ -536,6 +424,53 @@ router.get('/', (req, res) => {
 });
 
 // Rotas REST para chat autenticado
+router.post('/conversations', authenticateToken, ChatController.createConversation);
+router.get('/conversations/:id/messages', authenticateToken, ChatController.getConversationMessages);
+router.post('/conversations/:id/messages', authenticateToken, ChatController.addMessage);
+router.delete('/conversations/:id', authenticateToken, ChatController.deleteConversation);
+router.delete('/conversations', authenticateToken, ChatController.deleteAllUserConversations);
+
+// Rotas de monitoramento e health check
+router.get('/health', async (req, res) => {
+  try {
+    const healthStatus = await HealthCheckService.getAIStatus();
+    res.json(healthStatus);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+router.get('/health/metrics', async (req, res) => {
+  try {
+    const metrics = await HealthCheckService.getMetricsStatus();
+    res.json(metrics);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Metrics check failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+router.get('/health/tests', async (req, res) => {
+  try {
+    const testResults = await HealthCheckService.testAIServices();
+    res.json(testResults);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Tests failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Rotas para gerenciamento de conversas (APENAS para uso específico, não conflitar com rota principal)
 router.get('/conversations', authenticateToken, ChatController.getUserConversations);
 router.post('/conversations', authenticateToken, ChatController.createConversation);
 router.get('/conversations/:id/messages', authenticateToken, ChatController.getConversationMessages);

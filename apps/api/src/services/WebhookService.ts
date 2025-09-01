@@ -191,6 +191,16 @@ export class WebhookService {
 
       const { eventId, meetLink } = await createCalendarEvent(eventData);
 
+      console.log('🔍 [WEBHOOK] Resultado do createCalendarEvent:', {
+        agendamentoId,
+        eventId,
+        meetLink,
+        meetLinkType: typeof meetLink,
+        meetLinkLength: meetLink?.length,
+        hasEventId: !!eventId,
+        hasMeetLink: !!meetLink
+      });
+
       if (eventId || meetLink) {
         const updateData: any = {
           calendar_event_id: eventId,
@@ -199,14 +209,25 @@ export class WebhookService {
 
         if (meetLink) {
           updateData.google_meet_link = meetLink;
+          console.log('🔍 [WEBHOOK] Adicionando google_meet_link aos dados de atualização:', meetLink);
         }
 
-        await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from('agendamentos')
           .update(updateData)
           .eq('id', agendamentoId);
 
-        console.log('✅ Agendamento atualizado com dados do Google Calendar');
+        if (updateError) {
+          console.error('❌ [WEBHOOK] Erro ao atualizar agendamento:', updateError);
+        } else {
+          console.log('✅ [WEBHOOK] Agendamento atualizado com dados do Google Calendar:', {
+            agendamentoId,
+            eventId,
+            meetLink: updateData.google_meet_link
+          });
+        }
+      } else {
+        console.log('⚠️ [WEBHOOK] Nenhum eventId ou meetLink retornado do createCalendarEvent');
       }
     } catch (error) {
       console.error('❌ Erro ao criar evento no Google Calendar:', error);

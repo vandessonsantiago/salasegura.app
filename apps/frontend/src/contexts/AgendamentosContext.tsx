@@ -38,7 +38,7 @@ export interface ConsultaAgendada {
   copyPastePix?: string
   pixExpiresAt?: string
   calendar_event_id?: string
-              googleMeetLink?: string  // Fix: Backend sends camelCase, not snake_case
+  googleMeetLink?: string
 }
 
 interface AgendamentosContextType {
@@ -129,7 +129,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               copy_paste_pix?: string
               pix_expires_at?: string
               calendar_event_id?: string
-              googleMeetLink?: string  // Fix: Backend sends camelCase, not snake_case
+              google_meet_link?: string  // Fix: Backend sends snake_case
             }
 
             const consultasConvertidas = (dataArray as BackendConsulta[]).map(
@@ -187,8 +187,8 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   qrCodePix: item.qr_code_pix,
                   copyPastePix: item.copy_paste_pix,
                   pixExpiresAt: item.pix_expires_at,
-                  calendarEventId: item.calendar_event_id,
-                  googleMeetLink: item.googleMeetLink,
+                  calendar_event_id: item.calendar_event_id,
+                  googleMeetLink: item.google_meet_link,
                 };
 
                 console.log(`✅ Agendamento ${item.id} convertido com sucesso:`, {

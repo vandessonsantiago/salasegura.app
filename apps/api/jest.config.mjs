@@ -8,18 +8,13 @@ export default {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest'
+    '^.+\\.ts$': ['ts-jest', { useESM: true }]
   },
   moduleFileExtensions: ['ts', 'js'],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  },
   setupFilesAfterEnv: [],
   collectCoverageFrom: [
     'src/**/*.{ts,js}',

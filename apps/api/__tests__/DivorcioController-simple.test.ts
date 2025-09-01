@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Request, Response } from 'express';
 import DivorcioController from '../src/controllers/DivorcioController';
 

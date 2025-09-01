@@ -19,9 +19,18 @@ export class CalendarService {
     eventData: CalendarEventData
   ): Promise<{ success: boolean; eventId?: string; meetLink?: string; error?: string }> {
     try {
-      console.log(`📅 Criando evento no Google Calendar para agendamento ${agendamentoId}`);
+      console.log(`📅 [CALENDAR] Criando evento no Google Calendar para agendamento ${agendamentoId}`);
+      console.log(`📅 [CALENDAR] Dados do evento:`, eventData);
 
       const { eventId, meetLink } = await createCalendarEvent(eventData);
+
+      console.log(`📅 [CALENDAR] Resultado do createCalendarEvent:`, {
+        eventId,
+        meetLink,
+        hasEventId: !!eventId,
+        hasMeetLink: !!meetLink,
+        meetLinkType: typeof meetLink
+      });
 
       if (eventId || meetLink) {
         const updateData: any = {
@@ -34,18 +43,23 @@ export class CalendarService {
           updateData.google_meet_link_type = 'google_meet';
         }
 
+        console.log(`📅 [CALENDAR] Dados para atualização no banco:`, updateData);
+
         const { error } = await supabaseAdmin
           .from('agendamentos')
           .update(updateData)
           .eq('id', agendamentoId);
 
         if (error) {
-          console.error('❌ Erro ao atualizar agendamento com dados do calendário:', error);
+          console.error('❌ [CALENDAR] Erro ao atualizar agendamento com dados do calendário:', error);
           return { success: false, error: error.message };
         }
 
-        console.log('✅ Agendamento atualizado com dados do Google Calendar');
+        console.log('✅ [CALENDAR] Agendamento atualizado com dados do Google Calendar');
         return { success: true, eventId, meetLink };
+      } else {
+        console.log('⚠️ [CALENDAR] Nenhum eventId ou meetLink retornado');
+        return { success: false, error: 'Nenhum eventId ou meetLink retornado' };
       }
 
       return { success: false, error: 'Falha ao criar evento no Google Calendar' };

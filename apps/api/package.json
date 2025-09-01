@@ -13,9 +13,6 @@
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage"
   },
-  "jest": {
-    "preset": "@repo/jest-presets/node"
-  },
   "dependencies": {
     "@repo/logger": "workspace:*",
     "@supabase/supabase-js": "^2.56.0",

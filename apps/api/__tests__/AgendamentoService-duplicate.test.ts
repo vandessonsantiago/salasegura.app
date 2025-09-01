@@ -1,3 +1,44 @@
+import { jest } from '@jest/globals';
+
+// Mock do Supabase
+jest.mock('../src/lib/supabase', () => ({
+  supabaseAdmin: {
+    from: jest.fn(() => ({
+      insert: jest.fn(() => ({
+        select: jest.fn(() => ({
+          single: jest.fn(() => ({
+            data: {
+              id: 'test-agendamento-id',
+              user_id: 'test-user-123',
+              status: 'Pendente',
+              payment_status: 'pending',
+              valor: 99,
+              descricao: 'Consulta teste',
+              data: '2025-09-01',
+              horario: '10:00:00',
+              created_at: '2025-09-01T00:00:00Z',
+              updated_at: '2025-09-01T00:00:00Z'
+            },
+            error: null
+          }))
+        }))
+      })),
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            eq: jest.fn(() => ({
+              single: jest.fn(() => ({
+                data: null,
+                error: null
+              }))
+            }))
+          }))
+        }))
+      }))
+    }))
+  }
+}));
+
 import { AgendamentoService } from '../src/services/AgendamentoService';
 
 describe('AgendamentoService - Duplicate Prevention', () => {
@@ -8,6 +49,7 @@ describe('AgendamentoService - Duplicate Prevention', () => {
   beforeEach(async () => {
     // Clean up test data
     // Note: In real tests, you'd use a test database
+    jest.clearAllMocks();
   });
 
   test('should prevent duplicate agendamentos for same user/date/time', async () => {

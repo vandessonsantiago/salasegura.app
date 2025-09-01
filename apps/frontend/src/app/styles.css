@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+/* Hide debug-only elements when running in production (set by ClientInit) */
+html.env-prod [data-debug] {
+	display: none !important;
+}

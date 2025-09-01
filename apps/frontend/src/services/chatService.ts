@@ -29,12 +29,13 @@ interface ChatResponse {
 
 // Versão da API: v1
 import { apiEndpoint } from '@/lib/api';
+import { logger } from '@/lib/logger';
 const CHAT_ENDPOINT = apiEndpoint('/chat');
 
 export class ChatService {
   static async sendMessage(message: string, chatHistory: ChatMessage[], token?: string, conversationId?: string): Promise<ChatResponse> {
     try {
-      console.log('🚀 Enviando mensagem para API:', { message, historyLength: chatHistory.length });
+  logger.log('🚀 Enviando mensagem para API:', { message, historyLength: chatHistory.length });
       
   // Backend expõe rota POST /api/v1/chat
   const headers: Record<string,string> = {
@@ -62,7 +63,7 @@ export class ChatService {
       }
 
       const data: ChatResponse = await response.json();
-      console.log('✅ Resposta recebida da API:', { 
+  logger.log('✅ Resposta recebida da API:', { 
         responseLength: data.response.length, 
         hasConversion: !!data.conversionData,
         showAccessForm: data.showAccessForm,

@@ -6,6 +6,7 @@ import { useAuthenticatedChatStorage } from '@/hooks/useAuthenticatedChatStorage
 import { ChatService } from '@/services/chatService';
 import { MessageBlock, TypingAnimation, ThinkingAnimation } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/lib/logger';
 
 interface ChatContainerProps {
   onChatStart?: (started: boolean) => void;
@@ -34,11 +35,11 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
   const [isChatReset, setIsChatReset] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Log quando o componente é montado
+  // Log quando o componente é montado (usa logger para respeitar flags)
   useEffect(() => {
-    console.log('🎯 ChatContainer montado');
+    logger.log('🎯 ChatContainer montado');
     return () => {
-      console.log('💀 ChatContainer desmontado');
+      logger.log('💀 ChatContainer desmontado');
     };
   }, []);
 
@@ -709,9 +710,9 @@ const ChatContainer = forwardRef<ChatContainerRef, ChatContainerProps>(({ onChat
     handlePendingMessageFallback();
   }, [pendingMessage, isThinking, isTyping]);
 
-  // Adicionando elemento visual para debug
+  // Adicionando elemento visual para debug (marcado com data-debug; ocultado em produção via CSS)
   const DebugInfo = ({ context }: { context: string }) => (
-    <div style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '10px', fontSize: '12px', zIndex: 1000 }}>
+    <div data-debug style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '10px', fontSize: '12px', zIndex: 1000 }}>
       <strong>Debug:</strong> {context}
     </div>
   );

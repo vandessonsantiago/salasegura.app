@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCPF, formatPhone } from '../utils/formatters';
+import { logger } from '@/lib/logger';
 
 export interface CheckoutFormData {
   name: string;
@@ -84,7 +85,7 @@ export function useSimpleCheckout(initialData?: {
   const generatePix = async (value: number): Promise<PixData> => {
     setIsLoading(true);
     try {
-      console.log("🎯 [FRONTEND] ===== INÍCIO DO GERAR PIX =====");
+    logger.log("🎯 [FRONTEND] ===== INÍCIO DO GERAR PIX =====");
       console.log("💰 [FRONTEND] Valor:", value);
       console.log("👤 [FRONTEND] User ID:", user?.id);
       // Primeiro, tente criar pagamento real no backend (/api/v1/checkout)
@@ -108,7 +109,7 @@ export function useSimpleCheckout(initialData?: {
           userId: user?.id || "", // Adicionar userId ao payload
         };
 
-        console.log("� [FRONTEND] Payload completo sendo enviado:");
+  logger.log("� [FRONTEND] Payload completo sendo enviado:");
         console.log("📤 [FRONTEND] Customer:", payload.customer);
         console.log("📤 [FRONTEND] Billing Type:", payload.billingType);
         console.log("📤 [FRONTEND] Value:", payload.value);
@@ -118,7 +119,7 @@ export function useSimpleCheckout(initialData?: {
         console.log("📤 [FRONTEND] Service Data:", payload.serviceData);
         console.log("📤 [FRONTEND] User ID no payload:", payload.userId);
 
-        console.log("🟢 [FRONTEND] Enviando requisição ao backend http://localhost:8001/api/v1/checkout")
+  logger.log("🟢 [FRONTEND] Enviando requisição ao backend http://localhost:8001/api/v1/checkout")
         console.log("👤 [FRONTEND] User atual:", user);
         console.log("🔑 [FRONTEND] Session atual:", session ? "Presente" : "Ausente");
         console.log("🎫 [FRONTEND] Access token:", session?.access_token ? "Presente" : "Ausente");
@@ -129,7 +130,7 @@ export function useSimpleCheckout(initialData?: {
         const authToken = session?.access_token || 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c';
         
         headers["Authorization"] = `Bearer ${authToken}`;
-        console.log("🔐 [FRONTEND] Token de autenticação incluído na requisição:", authToken === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c' ? "TOKEN DEV" : "TOKEN USER");
+  logger.log("🔐 [FRONTEND] Token de autenticação incluído na requisição:", authToken === 'sbp_19d860ec11ce9e6b32732fa87a8c0b8d94f29a5c' ? "TOKEN DEV" : "TOKEN USER");
         
         const res = await fetch("http://localhost:8001/api/v1/checkout", {
           method: "POST",
@@ -144,7 +145,7 @@ export function useSimpleCheckout(initialData?: {
         }
 
         const json = await res.json()
-        console.log("🟢 [FRONTEND] Backend /api/v1/checkout resposta recebida");
+  logger.log("🟢 [FRONTEND] Backend /api/v1/checkout resposta recebida");
         console.log("📋 [FRONTEND] Payment ID:", json.paymentId);
         console.log("📅 [FRONTEND] Agendamento ID:", json.agendamentoId);
         console.log("📊 [FRONTEND] Status:", json.status);
@@ -170,7 +171,7 @@ export function useSimpleCheckout(initialData?: {
           throw new Error("Dados PIX incompletos retornados pelo servidor. Tente novamente ou entre em contato com o suporte.")
         }
 
-        console.log("✅ PIX data from backend is valid, using it")
+  logger.log("✅ PIX data from backend is valid, using it")
         setPaymentData(pixData)
         return pixData
       } catch (err) {

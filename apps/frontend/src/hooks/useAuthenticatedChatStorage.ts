@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { apiEndpoint } from '@/lib/api';
+import { logger } from '@/lib/logger';
 
 export interface AuthChatConversation {
   id: string;
@@ -25,7 +26,7 @@ export function useAuthenticatedChatStorage(token: string) {
   const fetchConversations = useCallback(async () => {
     try {
       const url = apiEndpoint('/chat/conversations');
-      console.log('useAuthenticatedChatStorage.fetchConversations calling URL:', url);
+  logger.log('useAuthenticatedChatStorage.fetchConversations calling URL:', url);
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -37,7 +38,7 @@ export function useAuthenticatedChatStorage(token: string) {
       const text = await res.text();
       try {
         const data = JSON.parse(text);
-        console.log('useAuthenticatedChatStorage.fetchConversations: parsed response', data);
+  logger.log('useAuthenticatedChatStorage.fetchConversations: parsed response', data);
         // Não atualizar o estado local para evitar re-renders desnecessários
         // setConversations(data.data || []);
         return data.data || [];
@@ -56,7 +57,7 @@ export function useAuthenticatedChatStorage(token: string) {
   const createConversation = useCallback(async (title?: string) => {
     try {
       const url = apiEndpoint('/chat/conversations');
-      console.log('useAuthenticatedChatStorage.createConversation calling URL:', url);
+  logger.log('useAuthenticatedChatStorage.createConversation calling URL:', url);
       const res = await fetch(url, {
         method: 'POST',
         headers: { 
@@ -73,7 +74,7 @@ export function useAuthenticatedChatStorage(token: string) {
       }
       try {
         const data = JSON.parse(body);
-        console.log('useAuthenticatedChatStorage.createConversation: parsed', data);
+  logger.log('useAuthenticatedChatStorage.createConversation: parsed', data);
         return data.data;
       } catch (e) {
         console.warn('useAuthenticatedChatStorage.createConversation: non-json response', { snippet: body.substring(0, 500) });
@@ -89,7 +90,7 @@ export function useAuthenticatedChatStorage(token: string) {
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
       const url = apiEndpoint(`/chat/conversations/${conversationId}/messages`);
-      console.log('useAuthenticatedChatStorage.fetchMessages calling URL:', url);
+  logger.log('useAuthenticatedChatStorage.fetchMessages calling URL:', url);
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -101,7 +102,7 @@ export function useAuthenticatedChatStorage(token: string) {
       }
       try {
         const data = JSON.parse(body);
-        console.log('useAuthenticatedChatStorage.fetchMessages: parsed', { 
+  logger.log('useAuthenticatedChatStorage.fetchMessages: parsed', { 
           conversationId, 
           length: (data.data || []).length,
           rawData: data,
@@ -128,8 +129,8 @@ export function useAuthenticatedChatStorage(token: string) {
   const addMessage = useCallback(async (conversationId: string, sender: string, content: string) => {
     try {
       const url = apiEndpoint(`/chat/conversations/${conversationId}/messages`);
-      console.log('useAuthenticatedChatStorage.addMessage calling URL:', url);
-      console.log('useAuthenticatedChatStorage.addMessage sending:', { conversationId, sender, content: content.substring(0, 50) });
+  logger.log('useAuthenticatedChatStorage.addMessage calling URL:', url);
+  logger.log('useAuthenticatedChatStorage.addMessage sending:', { conversationId, sender, content: content.substring(0, 50) });
       
       const res = await fetch(url, {
         method: 'POST',
@@ -147,7 +148,7 @@ export function useAuthenticatedChatStorage(token: string) {
       }
       try {
         const data = JSON.parse(body);
-        console.log('useAuthenticatedChatStorage.addMessage: parsed', {
+  logger.log('useAuthenticatedChatStorage.addMessage: parsed', {
           data,
           dataData: data.data,
           dataDataRole: data.data?.role,
@@ -168,7 +169,7 @@ export function useAuthenticatedChatStorage(token: string) {
   const deleteConversation = useCallback(async (conversationId: string) => {
     try {
       const url = apiEndpoint(`/chat/conversations/${conversationId}`);
-      console.log('useAuthenticatedChatStorage.deleteConversation calling URL:', url, { conversationId });
+  logger.log('useAuthenticatedChatStorage.deleteConversation calling URL:', url, { conversationId });
       const res = await fetch(url, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
@@ -182,7 +183,7 @@ export function useAuthenticatedChatStorage(token: string) {
         }
         return false;
       }
-      console.log('useAuthenticatedChatStorage.deleteConversation: success', { conversationId });
+  logger.log('useAuthenticatedChatStorage.deleteConversation: success', { conversationId });
       return true;
     } catch (err) {
       console.error('deleteConversation error', { error: err, conversationId });
@@ -194,7 +195,7 @@ export function useAuthenticatedChatStorage(token: string) {
   const fetchMessageCount = useCallback(async (conversationId: string): Promise<number> => {
     try {
       const url = apiEndpoint(`/chat/conversations/${conversationId}/messages`);
-      console.log('useAuthenticatedChatStorage.fetchMessageCount calling URL:', url);
+  logger.log('useAuthenticatedChatStorage.fetchMessageCount calling URL:', url);
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -206,7 +207,7 @@ export function useAuthenticatedChatStorage(token: string) {
       }
       try {
         const data = JSON.parse(body);
-        console.log('useAuthenticatedChatStorage.fetchMessageCount: parsed', { 
+  logger.log('useAuthenticatedChatStorage.fetchMessageCount: parsed', { 
           conversationId, 
           count: (data.data || []).length
         });
@@ -226,7 +227,7 @@ export function useAuthenticatedChatStorage(token: string) {
 
     try {
       const url = apiEndpoint('/chat/conversations');
-      console.log('useAuthenticatedChatStorage.deleteAllConversations calling URL:', url);
+  logger.log('useAuthenticatedChatStorage.deleteAllConversations calling URL:', url);
 
       const res = await fetch(url, {
         method: 'DELETE',
@@ -243,7 +244,7 @@ export function useAuthenticatedChatStorage(token: string) {
       }
 
       const result = await res.json();
-      console.log('useAuthenticatedChatStorage.deleteAllConversations: success', result);
+  logger.log('useAuthenticatedChatStorage.deleteAllConversations: success', result);
       return result.success || true;
     } catch (err) {
       console.error('deleteAllConversations error', err);

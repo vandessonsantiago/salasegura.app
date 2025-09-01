@@ -17,6 +17,7 @@ interface DashboardChatResponse {
 // Versão da API: v1
 // Dashboard chat usa mesma API base; ajustar para 3001 a não ser que exista segundo servidor.
 import { apiEndpoint } from '@/lib/api';
+import { logger } from '@/lib/logger';
 
 const DASHBOARD_CHAT_ENDPOINT = apiEndpoint('/dashboard-chat');
 
@@ -37,10 +38,10 @@ export class DashboardChatService {
         content: msg.content
       }));
 
-      console.log('📤 Enviando mensagem para dashboard chat:', {
-        message,
-        historyLength: formattedHistory.length
-      });
+        logger.log('📤 Enviando mensagem para dashboard chat:', {
+          message,
+          historyLength: formattedHistory.length
+        });
 
   // Backend expõe rota POST /api/v1/dashboard-chat
   const response = await fetch(DASHBOARD_CHAT_ENDPOINT, {
@@ -66,7 +67,7 @@ export class DashboardChatService {
       }
 
       const data = await response.json();
-      console.log('✅ Resposta recebida do dashboard chat:', data);
+        logger.log('✅ Resposta recebida do dashboard chat:', data);
 
       return {
         response: data.response,

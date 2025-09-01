@@ -5,6 +5,7 @@ import { AgendamentosProvider } from "@/contexts/AgendamentosContext";
 import { DivorceProvider } from "@/contexts/DivorceContext";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import "./styles.css";
+import ClientInit from "../lib/ClientInit";
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -24,6 +25,8 @@ export default function RootLayout({
             <AgendamentosProvider>
               <DivorceProvider>
                 <ToastProvider>
+                  {/* ClientInit runs only on the client and applies production logging rules */}
+                  <ClientInit />
                   {children}
                 </ToastProvider>
               </DivorceProvider>

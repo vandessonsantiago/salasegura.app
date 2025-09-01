@@ -385,7 +385,7 @@ export class CheckoutService {
 
       return {
         success: true,
-        paymentId: paymentRecordId, // 🔧 CORREÇÃO: Retornar o ID interno do Supabase, não o asaas_id
+        paymentId: paymentId, // ✅ Agora retorna o asaas_id correto para a foreign key
         qrCodePix: pixData.encodedImage,
         copyPastePix: pixData.payload,
         pixExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),

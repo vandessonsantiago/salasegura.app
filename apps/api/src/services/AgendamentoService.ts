@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin as supabase } from '../lib/supabase';
+import { PaymentService } from './PaymentService';
+import { CalendarService } from './CalendarService';
 
 // Tipo para request autenticado
 type AuthenticatedRequest = Request & {
@@ -30,72 +32,52 @@ export interface AgendamentoData {
   calendar_event_id?: string;
   google_meet_link?: string;
   google_meet_link_type?: string;
-  service_type?: string; // Opcional por enquanto
-  service_data?: any; // Opcional por enquanto
+  service_type?: string;
+  service_data?: any;
   created_at?: string;
   updated_at?: string;
 }
 
+// Interface para dados do cliente
+export interface ClienteData {
+  name: string;
+  email: string;
+  cpfCnpj: string;
+  phone?: string;
+}
+
 export class AgendamentoService {
   /**
-   * Cria um agendamento básico com dados mínimos
-   * Este método deve ser chamado ANTES do checkout
+   * Cria um novo agendamento (simplificado)
    */
-  static async criarAgendamentoBasico(
+  static async criarAgendamento(
     userId: string,
-    serviceType: string,
+    data: string,
+    horario: string,
     valor: number,
-    descricao: string,
-    serviceData?: any,
-    dataAgendamento?: string,
-    horarioAgendamento?: string
+    descricao: string
   ): Promise<{ success: boolean; agendamento?: AgendamentoData; error?: string }> {
     try {
-      const agendamentoId = randomUUID();
-
-      // Usar valores padrão se data/horário não forem fornecidos
-      const dataFinal = dataAgendamento || new Date().toISOString().split('T')[0]; // Data de hoje
-      const horarioFinal = horarioAgendamento || '09:00:00'; // 9:00 como padrão
-
-      // 🔧 CORREÇÃO: Verificar se já existe agendamento para esta data/horário
-      console.log('🔍 [AGENDAMENTO] Verificando duplicatas antes da criação:', {
-        userId,
-        data: dataFinal,
-        horario: horarioFinal
-      });
-
-      const { data: existingAgendamento, error: checkError } = await supabase
+      // Verificar se usuário já tem agendamento ativo
+      const { data: existingAgendamento } = await supabase
         .from('agendamentos')
         .select('id, status')
         .eq('user_id', userId)
-        .eq('data', dataFinal)
-        .eq('horario', horarioFinal)
+        .neq('status', 'Cancelado')
         .single();
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found
-        console.error('❌ [AGENDAMENTO] Erro ao verificar duplicatas:', checkError);
-        return { success: false, error: 'Erro ao verificar duplicatas' };
-      }
-
       if (existingAgendamento) {
-        console.log('⚠️ [AGENDAMENTO] Agendamento já existe para esta data/horário:', existingAgendamento.id);
-        // Se já existe e está pendente, podemos reutilizar
-        if (existingAgendamento.status === 'pending_payment') {
-          console.log('✅ [AGENDAMENTO] Reutilizando agendamento pendente existente');
-          return { success: true, agendamento: existingAgendamento as AgendamentoData };
-        } else {
-          return { success: false, error: 'Já existe um agendamento confirmado para esta data e horário' };
-        }
+        return { success: false, error: 'Usuário já possui um agendamento ativo' };
       }
 
-      // Por enquanto, não incluir service_type e service_data na inserção
-      // até que a migração seja executada
-      const agendamentoData: any = {
+      const agendamentoId = randomUUID();
+
+      const agendamentoData: Partial<AgendamentoData> = {
         id: agendamentoId,
         user_id: userId,
-        data: dataFinal,
-        horario: horarioFinal,
-        status: 'pending_payment',
+        data: data,
+        horario: horario,
+        status: 'Pendente',
         payment_status: 'pending',
         valor: valor,
         descricao: descricao,
@@ -103,80 +85,137 @@ export class AgendamentoService {
         updated_at: new Date().toISOString(),
       };
 
-      // Adicionar service_type e service_data apenas se as colunas existirem
-      // Isso será verificado dinamicamente ou através de uma flag
-      if (process.env.AGENDAMENTOS_HAS_SERVICE_COLUMNS === 'true') {
-        agendamentoData.service_type = serviceType;
-        agendamentoData.service_data = serviceData;
-      }
-
-      console.log('🏗️ [AGENDAMENTO] Criando agendamento básico:', {
-        id: agendamentoId,
-        user_id: userId,
-        data: dataAgendamento,
-        horario: horarioAgendamento,
-        service_type: serviceType,
-        valor: valor,
-        hasServiceColumns: process.env.AGENDAMENTOS_HAS_SERVICE_COLUMNS === 'true'
-      });
-
-      // 🔧 CORREÇÃO: Usar upsert em vez de insert para maior segurança
-      const { data, error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('agendamentos')
-        .upsert([agendamentoData], {
-          onConflict: 'user_id,data,horario',
-          ignoreDuplicates: false
-        })
+        .insert([agendamentoData])
         .select()
         .single();
 
-      console.log('🏗️ [AGENDAMENTO] 🔍 DEBUG: Resultado do upsert:', {
-        hasData: !!data,
-        hasError: !!error,
-        dataId: data?.id,
-        errorMessage: error?.message,
-        errorDetails: error
-      });
-
-      // 🔧 TEMPORÁRIO: Se erro de foreign key, tentar com userId válido
-      if (error && error.message?.includes('violates foreign key constraint')) {
-        console.log('🔧 [AGENDAMENTO] Foreign key error detectado, tentando com userId alternativo...');
-        agendamentoData.user_id = 'ac963a9a-57b0-4996-8d2b-1d70faf5564d'; // UserId válido do banco
-        
-        const { data: retryData, error: retryError } = await supabase
-          .from('agendamentos')
-          .upsert([agendamentoData], {
-            onConflict: 'user_id,data,horario',
-            ignoreDuplicates: false
-          })
-          .select()
-          .single();
-
-        if (retryError) {
-          console.error('❌ [AGENDAMENTO] Erro mesmo com userId alternativo:', retryError);
-          return { success: false, error: retryError.message };
-        }
-
-        console.log('✅ [AGENDAMENTO] Agendamento criado com userId alternativo:', retryData.id);
-        return { success: true, agendamento: retryData as AgendamentoData };
-      }
-
       if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao criar agendamento básico:', error);
+        console.error('❌ Erro ao criar agendamento:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [AGENDAMENTO] Agendamento básico criado com sucesso:', data.id);
-      return { success: true, agendamento: data as AgendamentoData };
+      console.log('✅ Agendamento criado com sucesso:', insertedData.id);
+      return { success: true, agendamento: insertedData as AgendamentoData };
     } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao criar agendamento básico:', error);
+      console.error('❌ Erro inesperado ao criar agendamento:', error);
       return { success: false, error: 'Erro interno do servidor' };
     }
   }
 
   /**
-   * Atualiza o agendamento com dados do cliente
-   * Chamado durante o preenchimento do formulário de checkout
+   * Cria um novo agendamento básico (usado pelo checkout)
+   */
+  static async criarAgendamentoBasico(
+    userId: string,
+    tipo: string,
+    valor: number,
+    descricao: string,
+    serviceData?: any,
+    data?: string,
+    horario?: string
+  ): Promise<{ success: boolean; agendamento?: AgendamentoData; error?: string }> {
+    try {
+      console.log("🎯 [AGENDAMENTO] Criando agendamento básico:", {
+        userId,
+        tipo,
+        valor,
+        descricao,
+        data,
+        horario,
+        hasServiceData: !!serviceData
+      });
+
+      const agendamentoId = randomUUID();
+
+      const agendamentoData: Partial<AgendamentoData> = {
+        id: agendamentoId,
+        user_id: userId,
+        data: data,
+        horario: horario,
+        status: 'Pendente',
+        payment_status: 'pending',
+        valor: valor,
+        descricao: descricao,
+        service_type: tipo, // 🔧 CORREÇÃO: Definir o tipo do serviço
+        // Incluir dados do cliente se fornecidos no serviceData
+        cliente_nome: serviceData?.clienteNome,
+        cliente_email: serviceData?.clienteEmail,
+        cliente_telefone: serviceData?.clienteTelefone,
+        // Incluir dados do calendário se fornecidos
+        calendar_event_id: serviceData?.calendarEventId,
+        google_meet_link: serviceData?.googleMeetLink,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: insertedData, error } = await supabase
+        .from('agendamentos')
+        .insert([agendamentoData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao criar agendamento básico:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Agendamento básico criado com sucesso:', insertedData.id);
+      return { success: true, agendamento: insertedData as AgendamentoData };
+    } catch (error) {
+      console.error('❌ Erro inesperado ao criar agendamento básico:', error);
+      return { success: false, error: 'Erro interno do servidor' };
+    }
+  }
+
+  /**
+   * Atualiza agendamento com dados do pagamento
+   */
+  static async atualizarComDadosPagamento(
+    agendamentoId: string,
+    paymentData: {
+      paymentId: string;
+      paymentStatus: string;
+      qrCodePix: string;
+      copyPastePix: string;
+      pixExpiresAt: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log("🔄 [AGENDAMENTO] Atualizando agendamento com dados do pagamento:", {
+        agendamentoId,
+        paymentId: paymentData.paymentId,
+        paymentStatus: paymentData.paymentStatus
+      });
+
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({
+          payment_id: paymentData.paymentId,
+          payment_status: paymentData.paymentStatus,
+          qr_code_pix: paymentData.qrCodePix,
+          copy_paste_pix: paymentData.copyPastePix,
+          pix_expires_at: paymentData.pixExpiresAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', agendamentoId);
+
+      if (error) {
+        console.error('❌ Erro ao atualizar agendamento com dados do pagamento:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Agendamento atualizado com dados do pagamento');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erro inesperado ao atualizar agendamento:', error);
+      return { success: false, error: 'Erro interno do servidor' };
+    }
+  }
+
+  /**
+   * Atualiza agendamento com dados do cliente
    */
   static async atualizarComDadosCliente(
     agendamentoId: string,
@@ -187,9 +226,10 @@ export class AgendamentoService {
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('📝 [AGENDAMENTO] Atualizando agendamento com dados do cliente:', {
+      console.log("👤 [AGENDAMENTO] Atualizando dados do cliente:", {
         agendamentoId,
-        clienteData
+        nome: clienteData.nome,
+        email: clienteData.email
       });
 
       const { error } = await supabase
@@ -203,291 +243,34 @@ export class AgendamentoService {
         .eq('id', agendamentoId);
 
       if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao atualizar dados do cliente:', error);
+        console.error('❌ Erro ao atualizar dados do cliente:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [AGENDAMENTO] Dados do cliente atualizados com sucesso');
+      console.log('✅ Dados do cliente atualizados');
       return { success: true };
     } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao atualizar dados do cliente:', error);
+      console.error('❌ Erro inesperado ao atualizar dados do cliente:', error);
       return { success: false, error: 'Erro interno do servidor' };
     }
   }
 
   /**
-   * Atualiza o agendamento com data e horário
-   * Chamado quando o usuário seleciona um slot disponível
-   */
-  static async atualizarComDataHorario(
-    agendamentoId: string,
-    dataHorario: {
-      data: string;
-      horario: string;
-    }
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      console.log('📅 [AGENDAMENTO] Atualizando agendamento com data e horário:', {
-        agendamentoId,
-        dataHorario
-      });
-
-      const { error } = await supabase
-        .from('agendamentos')
-        .update({
-          data: dataHorario.data,
-          horario: dataHorario.horario,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', agendamentoId);
-
-      if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao atualizar data e horário:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ [AGENDAMENTO] Data e horário atualizados com sucesso');
-      return { success: true };
-    } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao atualizar data e horário:', error);
-      return { success: false, error: 'Erro interno do servidor' };
-    }
-  }
-
-  /**
-   * Atualiza o agendamento com dados do pagamento e PIX
-   * Chamado APÓS o checkout ser processado com sucesso
-   */
-  static async atualizarComDadosPagamento(
-    agendamentoId: string,
-    paymentData: {
-      paymentId: string;
-      paymentStatus: string;
-      qrCodePix: string;
-      copyPastePix: string;
-      pixExpiresAt: string;
-    }
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: atualizarComDadosPagamento CHAMADO!');
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Parâmetros recebidos:', {
-        agendamentoId,
-        paymentId: paymentData.paymentId,
-        paymentStatus: paymentData.paymentStatus,
-        qrCodePixLength: paymentData.qrCodePix?.length || 0,
-        copyPastePixLength: paymentData.copyPastePix?.length || 0,
-        pixExpiresAt: paymentData.pixExpiresAt,
-      });
-
-      // 🔧 CORREÇÃO: Verificar se o payment_id já está sendo usado por outro agendamento
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Verificando duplicatas de payment_id...');
-      const { data: existingPayment, error: checkPaymentError } = await supabase
-        .from('agendamentos')
-        .select('id, payment_id')
-        .eq('payment_id', paymentData.paymentId)
-        .neq('id', agendamentoId)
-        .single();
-
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Resultado da verificação de duplicatas:', {
-        existingPayment: existingPayment?.id || 'NONE',
-        checkPaymentError: checkPaymentError?.message || 'NONE',
-        checkPaymentErrorCode: checkPaymentError?.code || 'NONE',
-      });
-
-      if (checkPaymentError && checkPaymentError.code !== 'PGRST116') {
-        console.error('❌ [AGENDAMENTO] Erro ao verificar payment_id duplicado:', checkPaymentError);
-        return { success: false, error: 'Erro ao verificar duplicatas de pagamento' };
-      }
-
-      if (existingPayment) {
-        console.error('❌ [AGENDAMENTO] Payment_id já está sendo usado por outro agendamento:', existingPayment.id);
-        return { success: false, error: 'Este pagamento já está associado a outro agendamento' };
-      }
-
-      // Primeiro, encontrar o registro de pagamento pelo asaas_id
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Buscando paymentRecord pelo asaas_id...');
-      const { data: paymentRecord, error: findError } = await supabase
-        .from('payments')
-        .select('id')
-        .eq('asaas_id', paymentData.paymentId)
-        .single();
-
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Busca por paymentRecord:', {
-        asaas_id: paymentData.paymentId,
-        paymentRecordFound: !!paymentRecord,
-        paymentRecordId: paymentRecord?.id,
-        findError: findError?.message,
-        findErrorCode: findError?.code,
-      });
-
-      if (findError || !paymentRecord) {
-        console.error('❌ [AGENDAMENTO] Pagamento não encontrado:', findError);
-        return { success: false, error: 'Pagamento não encontrado' };
-      }
-
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: PaymentRecord encontrado! ID:', paymentRecord.id);
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Preparando atualização do agendamento...');
-
-      const { error } = await supabase
-        .from('agendamentos')
-        .update({
-          payment_id: paymentRecord.id, // 🔧 CORREÇÃO: Usar o UUID interno do pagamento, não null
-          payment_status: paymentData.paymentStatus,
-          qr_code_pix: paymentData.qrCodePix,
-          copy_paste_pix: paymentData.copyPastePix,
-          pix_expires_at: paymentData.pixExpiresAt,
-          status: ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'].includes(paymentData.paymentStatus) ? 'confirmed' : 'pending_payment',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', agendamentoId);
-
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Tentativa de atualização no Supabase:', {
-        agendamentoId,
-        payment_id: null,
-        payment_status: paymentData.paymentStatus,
-        qr_code_pix: paymentData.qrCodePix ? 'PRESENTE' : 'NULL',
-        copy_paste_pix: paymentData.copyPastePix ? 'PRESENTE' : 'NULL',
-        pix_expires_at: paymentData.pixExpiresAt,
-        status: ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'].includes(paymentData.paymentStatus) ? 'confirmed' : 'pending_payment',
-        updateError: (error as any)?.message,
-        updateErrorCode: (error as any)?.code,
-      });
-
-      if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao atualizar dados do pagamento:', error);
-        return { success: false, error: (error as any).message };
-      }
-
-      // 🔍 DEBUG: Verificar se os dados foram salvos corretamente
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Verificando se os dados foram salvos...');
-      const { data: verifyDataCheck, error: verifyErrorCheck } = await supabase
-        .from('agendamentos')
-        .select('payment_id, payment_status, qr_code_pix, copy_paste_pix, pix_expires_at')
-        .eq('id', agendamentoId)
-        .single();
-
-      if (verifyErrorCheck) {
-        console.error('❌ [AGENDAMENTO] Erro ao verificar dados salvos:', verifyErrorCheck);
-      } else {
-        console.log('🔍 [AGENDAMENTO] Dados verificados após atualização:', {
-          payment_id: verifyDataCheck?.payment_id ? 'PRESENTE' : 'NULL',
-          payment_status: verifyDataCheck?.payment_status,
-          qr_code_pix: verifyDataCheck?.qr_code_pix ? 'PRESENTE' : 'NULL',
-          copy_paste_pix: verifyDataCheck?.copy_paste_pix ? 'PRESENTE' : 'NULL',
-          pix_expires_at: verifyDataCheck?.pix_expires_at ? 'PRESENTE' : 'NULL',
-        });
-      }
-
-      console.log('💳 [AGENDAMENTO] 🔍 DEBUG: Tentativa de atualização no Supabase:', {
-        agendamentoId,
-        payment_id: paymentRecord.id,
-        payment_status: paymentData.paymentStatus,
-        qr_code_pix: paymentData.qrCodePix ? 'PRESENTE' : 'NULL',
-        copy_paste_pix: paymentData.copyPastePix ? 'PRESENTE' : 'NULL',
-        pix_expires_at: paymentData.pixExpiresAt,
-        status: ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'].includes(paymentData.paymentStatus) ? 'confirmed' : 'pending_payment',
-        updateError: (error as any)?.message,
-        updateErrorCode: (error as any)?.code,
-      });
-
-      if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao atualizar dados do pagamento:', error);
-        return { success: false, error: (error as any).message };
-      }
-
-      // 🔍 DEBUG: Verificar se os dados foram salvos corretamente
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('agendamentos')
-        .select('payment_id, payment_status, qr_code_pix, copy_paste_pix, pix_expires_at')
-        .eq('id', agendamentoId)
-        .single();
-
-      if (verifyError) {
-        console.error('❌ [AGENDAMENTO] Erro ao verificar dados salvos:', verifyError);
-      } else {
-        console.log('🔍 [AGENDAMENTO] Dados verificados após atualização:', {
-          payment_id: verifyData?.payment_id ? 'PRESENTE' : 'NULL',
-          payment_status: verifyData?.payment_status,
-          qr_code_pix: verifyData?.qr_code_pix ? 'PRESENTE' : 'NULL',
-          copy_paste_pix: verifyData?.copy_paste_pix ? 'PRESENTE' : 'NULL',
-          pix_expires_at: verifyData?.pix_expires_at ? 'PRESENTE' : 'NULL',
-        });
-      }
-
-      console.log('✅ [AGENDAMENTO] Dados do pagamento atualizados com sucesso');
-      return { success: true };
-    } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao atualizar dados do pagamento:', error);
-      return { success: false, error: 'Erro interno do servidor' };
-    }
-  }
-
-  /**
-   * Busca um agendamento por ID
-   */
-  static async buscarAgendamento(
-    agendamentoId: string
-  ): Promise<{ success: boolean; agendamento?: AgendamentoData; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('agendamentos')
-        .select('*')
-        .eq('id', agendamentoId)
-        .single();
-
-      if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao buscar agendamento:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, agendamento: data as AgendamentoData };
-    } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao buscar agendamento:', error);
-      return { success: false, error: 'Erro interno do servidor' };
-    }
-  }
-
-  /**
-   * Lista agendamentos do usuário
-   */
-  static async listarAgendamentosUsuario(
-    userId: string
-  ): Promise<{ success: boolean; agendamentos?: AgendamentoData[]; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('agendamentos')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao listar agendamentos:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, agendamentos: data as AgendamentoData[] };
-    } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao listar agendamentos:', error);
-      return { success: false, error: 'Erro interno do servidor' };
-    }
-  }
-
-  /**
-   * Atualiza o agendamento com dados do calendário Google
-   * Chamado após a criação do evento no Google Calendar
+   * Atualiza agendamento com dados do calendário
    */
   static async atualizarComDadosCalendario(
     agendamentoId: string,
     calendarData: {
       calendar_event_id: string;
-      google_meet_link?: string;
-      google_meet_link_type?: string;
+      google_meet_link: string;
+      google_meet_link_type: string;
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('📅 [AGENDAMENTO] Atualizando agendamento com dados do calendário:', {
+      console.log("📅 [AGENDAMENTO] Atualizando dados do calendário:", {
         agendamentoId,
-        calendarData
+        calendar_event_id: calendarData.calendar_event_id,
+        google_meet_link: calendarData.google_meet_link
       });
 
       const { error } = await supabase
@@ -501,14 +284,176 @@ export class AgendamentoService {
         .eq('id', agendamentoId);
 
       if (error) {
-        console.error('❌ [AGENDAMENTO] Erro ao atualizar dados do calendário:', error);
+        console.error('❌ Erro ao atualizar dados do calendário:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [AGENDAMENTO] Dados do calendário atualizados com sucesso');
+      console.log('✅ Dados do calendário atualizados');
       return { success: true };
     } catch (error) {
-      console.error('❌ [AGENDAMENTO] Erro inesperado ao atualizar dados do calendário:', error);
+      console.error('❌ Erro inesperado ao atualizar dados do calendário:', error);
+      return { success: false, error: 'Erro interno do servidor' };
+    }
+  }
+
+  /**
+   * Processa pagamento do agendamento
+   */
+  static async processarPagamento(
+    agendamentoId: string,
+    cliente: ClienteData
+  ): Promise<{ success: boolean; error?: string; qrCodePix?: string; copyPastePix?: string }> {
+    try {
+      // Buscar agendamento
+      const { data: agendamento, error: fetchError } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .eq('id', agendamentoId)
+        .single();
+
+      if (fetchError || !agendamento) {
+        return { success: false, error: 'Agendamento não encontrado' };
+      }
+
+      // Processar pagamento
+      const paymentResult = await PaymentService.processarPagamentoAsaas(
+        cliente,
+        agendamento.valor,
+        agendamento.descricao,
+        agendamentoId,
+        agendamento.user_id
+      );
+
+      if (!paymentResult.success) {
+        return { success: false, error: paymentResult.error };
+      }
+
+      // Atualizar agendamento com dados do pagamento
+      const { error: updateError } = await supabase
+        .from('agendamentos')
+        .update({
+          payment_id: paymentResult.paymentId,
+          payment_status: 'PENDING',
+          qr_code_pix: paymentResult.qrCodePix,
+          copy_paste_pix: paymentResult.copyPastePix,
+          pix_expires_at: paymentResult.pixExpiresAt,
+          cliente_nome: cliente.name,
+          cliente_email: cliente.email,
+          cliente_telefone: cliente.phone || '',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', agendamentoId);
+
+      if (updateError) {
+        console.error('❌ Erro ao atualizar agendamento com dados do pagamento:', updateError);
+        return { success: false, error: updateError.message };
+      }
+
+      return {
+        success: true,
+        qrCodePix: paymentResult.qrCodePix,
+        copyPastePix: paymentResult.copyPastePix
+      };
+    } catch (error: any) {
+      console.error('❌ Erro ao processar pagamento:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Confirma agendamento e cria evento no calendário
+   */
+  static async confirmarAgendamento(agendamentoId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Buscar agendamento
+      const { data: agendamento, error: fetchError } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .eq('id', agendamentoId)
+        .single();
+
+      if (fetchError || !agendamento) {
+        return { success: false, error: 'Agendamento não encontrado' };
+      }
+
+      // Atualizar status
+      const { error: updateError } = await supabase
+        .from('agendamentos')
+        .update({
+          status: 'Confirmado',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', agendamentoId);
+
+      if (updateError) {
+        return { success: false, error: updateError.message };
+      }
+
+      // Criar evento no Google Calendar
+      const eventData = {
+        date: agendamento.data,
+        time: agendamento.horario,
+        summary: `Consulta - ${agendamento.cliente_nome}`,
+        description: agendamento.descricao || 'Consulta de alinhamento inicial',
+        attendees: [agendamento.cliente_email],
+        durationMinutes: 45
+      };
+
+      await CalendarService.criarEventoAgendamento(agendamentoId, eventData);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ Erro ao confirmar agendamento:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Busca agendamento do usuário
+   */
+  static async buscarAgendamentoUsuario(userId: string): Promise<{ success: boolean; agendamento?: AgendamentoData; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .eq('user_id', userId)
+        .neq('status', 'Cancelado')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, agendamento: data as AgendamentoData };
+    } catch (error) {
+      console.error('❌ Erro ao buscar agendamento:', error);
+      return { success: false, error: 'Erro interno do servidor' };
+    }
+  }
+
+  /**
+   * Cancela agendamento
+   */
+  static async cancelarAgendamento(agendamentoId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({
+          status: 'Cancelado',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', agendamentoId)
+        .eq('user_id', userId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erro ao cancelar agendamento:', error);
       return { success: false, error: 'Erro interno do servidor' };
     }
   }

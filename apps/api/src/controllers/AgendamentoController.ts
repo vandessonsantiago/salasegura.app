@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AgendamentoService } from '../services/AgendamentoService';
+import { AgendamentoService, ClienteData } from '../services/AgendamentoService';
 
 // Tipo para request autenticado
 type AuthenticatedRequest = Request & {
@@ -11,9 +11,9 @@ type AuthenticatedRequest = Request & {
 
 export class AgendamentoController {
   /**
-   * Criar agendamento básico
+   * Criar novo agendamento
    */
-  static async criarAgendamentoBasico(req: AuthenticatedRequest, res: Response): Promise<void> {
+  static async criarAgendamento(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -21,22 +21,22 @@ export class AgendamentoController {
         return;
       }
 
-      const { serviceType, valor, descricao, serviceData } = req.body;
+      const { data, horario, valor, descricao } = req.body;
 
-      if (!serviceType || !valor || !descricao) {
+      if (!data || !horario || !valor || !descricao) {
         res.status(400).json({
           success: false,
-          error: 'serviceType, valor e descricao são obrigatórios'
+          error: 'data, horario, valor e descricao são obrigatórios'
         });
         return;
       }
 
-      const resultado = await AgendamentoService.criarAgendamentoBasico(
+      const resultado = await AgendamentoService.criarAgendamento(
         userId,
-        serviceType,
+        data,
+        horario,
         valor,
-        descricao,
-        serviceData
+        descricao
       );
 
       if (!resultado.success) {
@@ -52,7 +52,7 @@ export class AgendamentoController {
         data: resultado.agendamento
       });
     } catch (error) {
-      console.error('Erro no controlador criarAgendamentoBasico:', error);
+      console.error('Erro no controlador criarAgendamento:', error);
       res.status(500).json({
         success: false,
         error: 'Erro interno do servidor'
@@ -61,18 +61,74 @@ export class AgendamentoController {
   }
 
   /**
-   * Buscar agendamento por ID
+   * Processar pagamento do agendamento
    */
-  static async buscarAgendamento(req: AuthenticatedRequest, res: Response): Promise<void> {
+  static async processarPagamento(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-
-      if (!id) {
-        res.status(400).json({ success: false, error: 'ID do agendamento é obrigatório' });
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, error: 'Usuário não autenticado' });
         return;
       }
 
-      const resultado = await AgendamentoService.buscarAgendamento(id);
+      const { agendamentoId, cliente } = req.body;
+
+      if (!agendamentoId || !cliente) {
+        res.status(400).json({
+          success: false,
+          error: 'agendamentoId e cliente são obrigatórios'
+        });
+        return;
+      }
+
+      const clienteData: ClienteData = {
+        name: cliente.name,
+        email: cliente.email,
+        cpfCnpj: cliente.cpfCnpj,
+        phone: cliente.phone
+      };
+
+      const resultado = await AgendamentoService.processarPagamento(
+        agendamentoId,
+        clienteData
+      );
+
+      if (!resultado.success) {
+        res.status(400).json({
+          success: false,
+          error: resultado.error || 'Erro ao processar pagamento'
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          qrCodePix: resultado.qrCodePix,
+          copyPastePix: resultado.copyPastePix
+        }
+      });
+    } catch (error) {
+      console.error('Erro no controlador processarPagamento:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  /**
+   * Buscar agendamento do usuário
+   */
+  static async buscarAgendamentoUsuario(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+        return;
+      }
+
+      const resultado = await AgendamentoService.buscarAgendamentoUsuario(userId);
 
       if (!resultado.success) {
         res.status(404).json({
@@ -87,7 +143,7 @@ export class AgendamentoController {
         data: resultado.agendamento
       });
     } catch (error) {
-      console.error('Erro no controlador buscarAgendamento:', error);
+      console.error('Erro no controlador buscarAgendamentoUsuario:', error);
       res.status(500).json({
         success: false,
         error: 'Erro interno do servidor'
@@ -96,9 +152,47 @@ export class AgendamentoController {
   }
 
   /**
-   * Listar agendamentos do usuário
+   * Confirmar agendamento (chamado pelo webhook)
    */
-  static async listarAgendamentosUsuario(req: AuthenticatedRequest, res: Response): Promise<void> {
+  static async confirmarAgendamento(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { agendamentoId } = req.body;
+
+      if (!agendamentoId) {
+        res.status(400).json({
+          success: false,
+          error: 'agendamentoId é obrigatório'
+        });
+        return;
+      }
+
+      const resultado = await AgendamentoService.confirmarAgendamento(agendamentoId);
+
+      if (!resultado.success) {
+        res.status(400).json({
+          success: false,
+          error: resultado.error || 'Erro ao confirmar agendamento'
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Agendamento confirmado com sucesso'
+      });
+    } catch (error) {
+      console.error('Erro no controlador confirmarAgendamento:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  /**
+   * Cancelar agendamento
+   */
+  static async cancelarAgendamento(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -106,65 +200,32 @@ export class AgendamentoController {
         return;
       }
 
-      const resultado = await AgendamentoService.listarAgendamentosUsuario(userId);
+      const { agendamentoId } = req.body;
+
+      if (!agendamentoId) {
+        res.status(400).json({
+          success: false,
+          error: 'agendamentoId é obrigatório'
+        });
+        return;
+      }
+
+      const resultado = await AgendamentoService.cancelarAgendamento(agendamentoId, userId);
 
       if (!resultado.success) {
         res.status(400).json({
           success: false,
-          error: resultado.error || 'Erro ao listar agendamentos'
+          error: resultado.error || 'Erro ao cancelar agendamento'
         });
         return;
       }
 
       res.json({
         success: true,
-        data: resultado.agendamentos
+        message: 'Agendamento cancelado com sucesso'
       });
     } catch (error) {
-      console.error('Erro no controlador listarAgendamentosUsuario:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Erro interno do servidor'
-      });
-    }
-  }
-
-  /**
-   * Atualizar dados do cliente no agendamento
-   */
-  static async atualizarDadosCliente(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { nome, email, telefone } = req.body;
-
-      if (!id || !nome || !email || !telefone) {
-        res.status(400).json({
-          success: false,
-          error: 'ID, nome, email e telefone são obrigatórios'
-        });
-        return;
-      }
-
-      const resultado = await AgendamentoService.atualizarComDadosCliente(id, {
-        nome,
-        email,
-        telefone
-      });
-
-      if (!resultado.success) {
-        res.status(400).json({
-          success: false,
-          error: resultado.error || 'Erro ao atualizar dados do cliente'
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        message: 'Dados do cliente atualizados com sucesso'
-      });
-    } catch (error) {
-      console.error('Erro no controlador atualizarDadosCliente:', error);
+      console.error('Erro no controlador cancelarAgendamento:', error);
       res.status(500).json({
         success: false,
         error: 'Erro interno do servidor'

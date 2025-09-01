@@ -136,12 +136,9 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               (item) => {
                 // Mapeamento de status do backend para o frontend
                 const mapBackendStatus = (backendStatus: string, paymentStatus: string): ConsultaAgendada["status"] => {
-                  console.log(`🔍 [STATUS_MAPPING] Entrada: backendStatus="${backendStatus}", paymentStatus="${paymentStatus}"`);
-                  
                   // Se o payment_status indicar pagamento concluído, o agendamento deve ser CONFIRMED
                   const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'];
                   if (paymentStatus && completedStatuses.includes(paymentStatus)) {
-                    console.log(`✅ [STATUS_MAPPING] Retornando CONFIRMED via paymentStatus`);
                     return "CONFIRMED"
                   }
                   
@@ -150,7 +147,6 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   
                   switch (normalizedBackendStatus) {
                     case "payment_received":
-                      console.log(`✅ [STATUS_MAPPING] Status 'payment_received' mapeado para CONFIRMED`);
                       return "CONFIRMED"
                     case "confirmed":
                       return "CONFIRMED"

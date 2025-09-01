@@ -32,6 +32,7 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
   const [isClearingAll, setIsClearingAll] = useState(false);
+  const [animatingDeleteIds, setAnimatingDeleteIds] = useState<Set<string>>(new Set());
 
   // Estados para o dialog de confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -230,26 +231,44 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
     e.stopPropagation();
 
     const performDelete = async () => {
-      if (isAuthenticated) {
-        try {
-          setDeletingConversationId(sessionId);
-          const deleteSuccess = await authChat.deleteConversation(sessionId);
-          if (deleteSuccess) {
-            // Forçar refresh das conversas
-            setRefreshTrigger(prev => prev + 1);
-            showSuccess('Conversa excluída', 'A conversa foi removida com sucesso.');
-          } else {
+      // Iniciar animação de deleção
+      setAnimatingDeleteIds(prev => new Set(prev).add(sessionId));
+
+      // Aguardar a animação completar (400ms)
+      setTimeout(async () => {
+        if (isAuthenticated) {
+          try {
+            setDeletingConversationId(sessionId);
+            const deleteSuccess = await authChat.deleteConversation(sessionId);
+            if (deleteSuccess) {
+              // Forçar refresh das conversas
+              setRefreshTrigger(prev => prev + 1);
+              showSuccess('Conversa excluída', 'A conversa foi removida com sucesso.');
+            } else {
+              showError('Erro ao excluir conversa', 'Tente novamente.');
+            }
+          } catch (err) {
+            console.error('Erro ao excluir conversa:', err);
             showError('Erro ao excluir conversa', 'Tente novamente.');
+          } finally {
+            setDeletingConversationId(null);
+            // Remover da lista de animação
+            setAnimatingDeleteIds(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(sessionId);
+              return newSet;
+            });
           }
-        } catch (err) {
-          console.error('Erro ao excluir conversa:', err);
-          showError('Erro ao excluir conversa', 'Tente novamente.');
-        } finally {
-          setDeletingConversationId(null);
+        } else {
+          deleteLocalSession(sessionId);
+          // Remover da lista de animação
+          setAnimatingDeleteIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(sessionId);
+            return newSet;
+          });
         }
-      } else {
-        deleteLocalSession(sessionId);
-      }
+      }, 400);
     };
 
     showConfirmDialog(
@@ -262,27 +281,38 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
 
   const clearAllSessions = async () => {
     const performClearAll = async () => {
-      if (isAuthenticated) {
-        try {
-          setIsClearingAll(true);
-          const deleteSuccess = await authChat.deleteAllConversations();
-          if (deleteSuccess) {
-            // Forçar refresh das conversas
-            setRefreshTrigger(prev => prev + 1);
-            showSuccess('Conversas limpas', 'Todas as conversas foram removidas com sucesso.');
-          } else {
+      // Iniciar animação para todas as conversas
+      const allSessionIds = filteredSessions.map(session => session.id);
+      setAnimatingDeleteIds(new Set(allSessionIds));
+
+      // Aguardar a animação completar (400ms)
+      setTimeout(async () => {
+        if (isAuthenticated) {
+          try {
+            setIsClearingAll(true);
+            const deleteSuccess = await authChat.deleteAllConversations();
+            if (deleteSuccess) {
+              // Forçar refresh das conversas
+              setRefreshTrigger(prev => prev + 1);
+              showSuccess('Conversas limpas', 'Todas as conversas foram removidas com sucesso.');
+            } else {
+              showError('Erro ao limpar conversas', 'Tente novamente.');
+            }
+          } catch (error) {
+            console.error('Erro ao limpar conversas do banco de dados:', error);
             showError('Erro ao limpar conversas', 'Tente novamente.');
+          } finally {
+            setIsClearingAll(false);
+            // Limpar todas as animações
+            setAnimatingDeleteIds(new Set());
           }
-        } catch (error) {
-          console.error('Erro ao limpar conversas do banco de dados:', error);
-          showError('Erro ao limpar conversas', 'Tente novamente.');
-        } finally {
-          setIsClearingAll(false);
+        } else {
+          clearAllLocalSessions();
+          showSuccess('Conversas limpas', 'Todas as conversas locais foram removidas.');
+          // Limpar todas as animações
+          setAnimatingDeleteIds(new Set());
         }
-      } else {
-        clearAllLocalSessions();
-        showSuccess('Conversas limpas', 'Todas as conversas locais foram removidas.');
-      }
+      }, 400);
     };
 
     showConfirmDialog(
@@ -372,7 +402,15 @@ export default function MessageModal({ isOpen, onClose, onLoadSession }: Message
                 <div
                   key={session.id}
                   onClick={() => handleLoadSession(session)}
-                  className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer relative group"
+                  className={`p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 cursor-pointer relative group ${
+                    animatingDeleteIds.has(session.id)
+                      ? 'opacity-0 transform -translate-x-full scale-95 transition-all duration-400 ease-in-out'
+                      : 'opacity-100 transform translate-x-0 scale-100'
+                  }`}
+                  style={{
+                    transition: 'all 0.4s ease-in-out',
+                    transformOrigin: 'center'
+                  }}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-gray-900 text-sm">

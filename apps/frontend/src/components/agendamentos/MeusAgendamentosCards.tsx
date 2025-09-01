@@ -53,7 +53,16 @@ export default function MeusAgendamentosCards({ onAbrirModal }: MeusAgendamentos
       case 'PENDING':
         return 'Realize o pagamento PIX em até 24 horas para confirmar sua consulta'
       case 'CONFIRMED':
-        return 'Sua consulta está confirmada e o link da reunião será enviado em breve'
+        // Verificar se tem link válido do Google Meet
+        const hasValidLink = consulta.googleMeetLink &&
+                           typeof consulta.googleMeetLink === 'string' &&
+                           consulta.googleMeetLink.trim().length > 0 &&
+                           (consulta.googleMeetLink.trim().startsWith('http') ||
+                            consulta.googleMeetLink.trim().includes('meet.google.com'));
+
+        return hasValidLink
+          ? 'Sua consulta está confirmada! Use o botão abaixo para entrar na reunião.'
+          : 'Sua consulta está confirmada e o link da reunião será enviado em breve'
       case 'CANCELLED':
         return 'Este agendamento foi cancelado'
       case 'EXPIRED':
@@ -236,7 +245,7 @@ export default function MeusAgendamentosCards({ onAbrirModal }: MeusAgendamentos
 
               {/* Ações */}
               <div className="space-y-3">
-                {consulta.status === 'CONFIRMED' && consulta.googleMeetLink && (
+                {consulta.googleMeetLink && (consulta.status === 'CONFIRMED' || consulta.status === 'PENDING') && (
                   <button
                     onClick={() => window.open(consulta.googleMeetLink, '_blank')}
                     className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center gap-3 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"

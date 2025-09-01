@@ -520,42 +520,29 @@ export default function MeusAgendamentosModal({
                           raw_link_chars: consulta.googleMeetLink?.split('').map(c => c.charCodeAt(0))
                         });
 
-                        // Condições de verificação (mais claras e detalhadas)
-                        const linkExists = consulta.googleMeetLink !== null && consulta.googleMeetLink !== undefined;
-                        const linkIsString = typeof consulta.googleMeetLink === 'string';
-                        const linkNotEmpty = consulta.googleMeetLink !== "";
-                        const linkNotWhitespace = consulta.googleMeetLink?.trim() !== "";
-                        const linkHasContent = Boolean(consulta.googleMeetLink?.trim() && consulta.googleMeetLink.trim().length > 0);
-                        const linkIsValidUrl = consulta.googleMeetLink?.trim()?.startsWith('http') || consulta.googleMeetLink?.trim()?.includes('meet.google.com');
-                        const statusIsConfirmed = consulta.status === "CONFIRMED";
+                        // Condições simplificadas
+                        const statusIsConfirmed = consulta.status === "CONFIRMED" || consulta.status === "PENDING";
                         const hasCalendarEvent = !!consulta.calendar_event_id;
+                        const hasValidLink = consulta.googleMeetLink &&
+                                           typeof consulta.googleMeetLink === 'string' &&
+                                           consulta.googleMeetLink.trim().length > 0 &&
+                                           (consulta.googleMeetLink.trim().startsWith('http') ||
+                                            consulta.googleMeetLink.trim().includes('meet.google.com'));
 
-                        console.log("🔍 Condições de verificação:", {
-                          linkExists,
-                          linkIsString,
-                          linkNotEmpty,
-                          linkNotWhitespace,
-                          linkHasContent,
-                          linkIsValidUrl,
+                        console.log("🔍 Condições simplificadas:", {
                           statusIsConfirmed,
                           hasCalendarEvent,
-                          final_hasValidLink: linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl
+                          hasValidLink,
+                          googleMeetLink: consulta.googleMeetLink
                         });
-
-                        // Condição final para exibir o link - com fallback mais permissivo
-                        const hasValidLink = (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && linkIsValidUrl) ||
-                                           (linkExists && linkIsString && linkNotEmpty && linkNotWhitespace && linkHasContent && statusIsConfirmed && consulta.googleMeetLink?.trim()?.includes('meet.google.com'));
 
                         console.log("🎯 DECISÃO FINAL:", {
                           hasValidLink,
-                          hasValidUrl: linkIsValidUrl,
-                          hasContent: linkHasContent,
+                          hasCalendarEvent,
+                          statusIsConfirmed,
                           action: hasValidLink ? "EXIBIR BOTÃO DA REUNIÃO" :
-                                 (hasCalendarEvent && statusIsConfirmed) ? "EXIBIR MENSAGEM DE EVENTO CRIADO" :
                                  statusIsConfirmed ? "EXIBIR MENSAGEM DE AGUARDAR LINK" :
-                                 "NÃO EXIBIR NADA",
-                          // Fallback: se tem conteúdo mas não é URL válida, ainda mostrar
-                          fallback_action: (!hasValidLink && linkHasContent && statusIsConfirmed) ? "EXIBIR BOTÃO DA REUNIÃO (FALLBACK)" : "MANTER DECISÃO ORIGINAL"
+                                 "NÃO EXIBIR NADA"
                         });
                         console.log("🔍 === FIM DA ANÁLISE ===");
 
@@ -574,21 +561,13 @@ export default function MeusAgendamentosModal({
                               </span>
                             </div>
                             <button
-                              onClick={() => handleEntrarReuniao(consulta.googleMeetLink)}
-                              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-105"
+                              onClick={() => window.open(consulta.googleMeetLink, '_blank')}
+                              className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center gap-3 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                             >
+                              <VideoCameraIcon size={20} weight="fill" />
                               <ArrowUpRightIcon size={18} weight="fill" />
                               Entrar na reunião
                             </button>
-                          </div>
-                        ) : hasCalendarEvent && statusIsConfirmed ? (
-                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">
-                            <p className="text-blue-800 text-center font-medium">
-                              🎉 Reunião agendada! O link será enviado em breve.
-                            </p>
-                            <p className="text-sm text-blue-600 text-center mt-2">
-                              Clique em 🔄 para atualizar se necessário
-                            </p>
                           </div>
                         ) : statusIsConfirmed ? (
                           <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4 mb-6">

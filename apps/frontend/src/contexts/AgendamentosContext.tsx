@@ -20,6 +20,7 @@ export interface ConsultaAgendada {
   paymentId: string | undefined
   paymentStatus:
     | "PENDING"
+    | "RECEIVED"
     | "CONFIRMED"
     | "CANCELLED"
     | "EXPIRED"
@@ -135,9 +136,12 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               (item) => {
                 // Mapeamento de status do backend para o frontend
                 const mapBackendStatus = (backendStatus: string, paymentStatus: string): ConsultaAgendada["status"] => {
+                  console.log(`🔍 [STATUS_MAPPING] Entrada: backendStatus="${backendStatus}", paymentStatus="${paymentStatus}"`);
+                  
                   // Se o payment_status indicar pagamento concluído, o agendamento deve ser CONFIRMED
                   const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED'];
                   if (paymentStatus && completedStatuses.includes(paymentStatus)) {
+                    console.log(`✅ [STATUS_MAPPING] Retornando CONFIRMED via paymentStatus`);
                     return "CONFIRMED"
                   }
                   
@@ -145,6 +149,11 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
                   const normalizedBackendStatus = backendStatus?.toLowerCase();
                   
                   switch (normalizedBackendStatus) {
+                    case "payment_received":
+                      console.log(`✅ [STATUS_MAPPING] Status 'payment_received' mapeado para CONFIRMED`);
+                      return "CONFIRMED"
+                    case "confirmed":
+                      return "CONFIRMED"
                     case "pending_payment":
                     case "pending":
                       return "PENDING"
@@ -188,6 +197,8 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
 
                 console.log(`✅ Agendamento ${item.id} convertido com sucesso:`, {
                   status: converted.status,
+                  paymentStatus: converted.paymentStatus,
+                  googleMeetLink: converted.googleMeetLink ? "PRESENTE" : "AUSENTE",
                   qrCodePix: converted.qrCodePix ? "PRESENTE" : "AUSENTE",
                   copyPastePix: converted.copyPastePix ? "PRESENTE" : "AUSENTE",
                 });
@@ -482,6 +493,38 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  // Função de debug para verificar dados do backend
+  const debugBackendData = useCallback(async () => {
+    if (!session?.access_token) return
+
+    try {
+      console.log("🔍 [DEBUG] Verificando dados diretamente do backend...")
+      const result = await authJsonFetch(
+        "/agendamento-new/meu-agendamento",
+        session.access_token,
+        { method: 'GET' }
+      )
+
+      console.log("🔍 [DEBUG] Resposta bruta do backend:", result)
+      
+      if (result && result.success && result.data) {
+        const data = Array.isArray(result.data) ? result.data[0] : result.data
+        console.log("🔍 [DEBUG] Dados detalhados do agendamento:", {
+          id: data.id,
+          status: data.status,
+          payment_status: data.payment_status,
+          google_meet_link: data.google_meet_link,
+          calendar_event_id: data.calendar_event_id,
+          google_meet_link_type: typeof data.google_meet_link,
+          calendar_event_id_type: typeof data.calendar_event_id,
+          allFields: Object.keys(data)
+        })
+      }
+    } catch (error) {
+      console.error("❌ [DEBUG] Erro ao buscar dados:", error)
+    }
+  }, [session?.access_token])
+
   // Sistema de polling para verificar atualizações de status de pagamento
   useEffect(() => {
     if (!session?.access_token || consultasAgendadas.length === 0) return
@@ -522,6 +565,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
               const completedStatuses = ['RECEIVED', 'CONFIRMED', 'PAID', 'COMPLETED', 'APPROVED']
               const newStatus = paymentStatus && completedStatuses.includes(paymentStatus) ? 'CONFIRMED' :
                                backendStatus === 'confirmed' ? 'CONFIRMED' :
+                               backendStatus === 'payment_received' ? 'CONFIRMED' :
                                backendStatus === 'pending_payment' ? 'PENDING' :
                                backendStatus === 'cancelled' ? 'CANCELLED' :
                                backendStatus === 'expired' ? 'EXPIRED' : 'PENDING'

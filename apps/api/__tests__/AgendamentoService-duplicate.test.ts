@@ -39,7 +39,7 @@ jest.mock('../src/lib/supabase', () => ({
   }
 }));
 
-import { AgendamentoService } from '../src/services/AgendamentoService';
+import { AgendamentoService } from '../src/agendamentos';
 
 describe('AgendamentoService - Duplicate Prevention', () => {
   const testUserId = 'test-user-123';

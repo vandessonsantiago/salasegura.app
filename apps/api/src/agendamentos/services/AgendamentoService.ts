@@ -462,4 +462,87 @@ export class AgendamentoService {
   static async buscarAgendamentoUsuario(userId: string) {
     return this.getUserAgendamento(userId);
   }
+
+  // Métodos adicionais para compatibilidade com checkout
+  static async criarAgendamentoBasico(
+    userId: string,
+    tipo: string,
+    valor: number,
+    descricao: string,
+    serviceData?: any,
+    data?: string,
+    horario?: string
+  ) {
+    const agendamentoData: AgendamentoInsert = {
+      user_id: userId,
+      data: data || '',
+      horario: horario || '',
+      valor,
+      descricao,
+      service_type: tipo,
+      service_data: serviceData,
+      cliente_nome: serviceData?.clienteNome,
+      cliente_email: serviceData?.clienteEmail,
+      cliente_telefone: serviceData?.clienteTelefone,
+      calendar_event_id: serviceData?.calendarEventId,
+      google_meet_link: serviceData?.googleMeetLink
+    };
+
+    return this.createAgendamento(userId, agendamentoData);
+  }
+
+  static async atualizarComDadosPagamento(
+    agendamentoId: string,
+    paymentData: {
+      paymentId: string;
+      paymentStatus: string;
+      qrCodePix: string;
+      copyPastePix: string;
+      pixExpiresAt: string;
+    }
+  ) {
+    const updateData: AgendamentoUpdate = {
+      payment_id: paymentData.paymentId,
+      payment_status: paymentData.paymentStatus as 'pending' | 'paid' | 'failed' | 'refunded',
+      qr_code_pix: paymentData.qrCodePix,
+      copy_paste_pix: paymentData.copyPastePix,
+      pix_expires_at: paymentData.pixExpiresAt
+    };
+
+    return this.updateAgendamento(agendamentoId, '', updateData);
+  }
+
+  static async atualizarComDadosCliente(
+    agendamentoId: string,
+    clienteData: {
+      nome: string;
+      email: string;
+      telefone: string;
+    }
+  ) {
+    const updateData: AgendamentoUpdate = {
+      cliente_nome: clienteData.nome,
+      cliente_email: clienteData.email,
+      cliente_telefone: clienteData.telefone
+    };
+
+    return this.updateAgendamento(agendamentoId, '', updateData);
+  }
+
+  static async atualizarComDadosCalendario(
+    agendamentoId: string,
+    calendarData: {
+      calendar_event_id: string;
+      google_meet_link: string;
+      google_meet_link_type: string;
+    }
+  ) {
+    const updateData: AgendamentoUpdate = {
+      calendar_event_id: calendarData.calendar_event_id,
+      google_meet_link: calendarData.google_meet_link,
+      google_meet_link_type: calendarData.google_meet_link_type
+    };
+
+    return this.updateAgendamento(agendamentoId, '', updateData);
+  }
 }

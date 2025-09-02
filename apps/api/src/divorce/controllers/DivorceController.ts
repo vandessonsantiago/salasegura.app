@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
-import { supabaseAdmin as supabase } from '../lib/supabase';
+import { supabaseAdmin as supabase } from '../../lib/supabase';
+import { DivorceService } from '../services/DivorceService';
 
 // Tipo para request autenticado
 type AuthenticatedRequest = Request & {

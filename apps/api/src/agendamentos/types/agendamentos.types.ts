@@ -45,6 +45,8 @@ export interface AgendamentoInsert {
   cliente_telefone?: string;
   service_type?: string;
   service_data?: any;
+  calendar_event_id?: string;
+  google_meet_link?: string;
 }
 
 export interface AgendamentoUpdate {
@@ -61,6 +63,10 @@ export interface AgendamentoUpdate {
   google_meet_link?: string;
   google_meet_link_type?: string;
   service_data?: any;
+  payment_id?: string;
+  qr_code_pix?: string;
+  copy_paste_pix?: string;
+  pix_expires_at?: string;
 }
 
 export interface AgendamentoStats {

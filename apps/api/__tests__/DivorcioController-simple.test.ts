@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { Request, Response } from 'express';
-import DivorcioController from '../src/controllers/DivorcioController';
+import DivorceController from '../src/divorce/controllers/DivorceController';
 
 // Mock do Supabase
 jest.mock('../src/lib/supabase', () => ({
@@ -52,7 +52,7 @@ describe('DivorcioController - Teste Básico', () => {
       body: { type: 'express' }
     };
 
-    await DivorcioController.iniciarCaso(mockRequest, mockResponse);
+    await DivorceController.iniciarCaso(mockRequest, mockResponse);
 
     expect(mockResponse.status).toHaveBeenCalledWith(401);
     expect(mockResponse.json).toHaveBeenCalledWith({

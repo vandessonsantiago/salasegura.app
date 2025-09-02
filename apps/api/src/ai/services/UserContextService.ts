@@ -1,6 +1,6 @@
 import { UserService } from '../../services/UserService';
-import { AgendamentoService } from '../../services/AgendamentoService';
-import { DivorceService } from '../../services/DivorceService';
+import { AgendamentoService } from '../../agendamentos';
+import { DivorceService } from '../../divorce';
 import { supabaseAdmin as supabase } from '../../lib/supabase';
 import { CacheService } from './CacheService';
 

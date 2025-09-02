@@ -3,8 +3,8 @@ import axios from 'axios';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin as supabase } from '../lib/supabase';
-import { AgendamentoService, AgendamentoData } from './AgendamentoService';
-import { DivorceService } from './DivorceService';
+import { AgendamentoService, AgendamentoData } from '../agendamentos';
+import { DivorceService } from '../divorce';
 import { createCalendarEvent, updateCalendarEvent } from './google-calendar';
 import * as dotenv from 'dotenv';
 

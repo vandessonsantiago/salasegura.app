@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { CheckoutService, CheckoutData, CheckoutResponse } from './CheckoutService';
-import { DivorceService } from './DivorceService';
-import { AgendamentoService } from './AgendamentoService';
+import { DivorceService } from '../divorce';
+import { AgendamentoService } from '../agendamentos';
 
 // Tipo para request autenticado
 type AuthenticatedRequest = Request & {

@@ -8,3 +8,4 @@ export { default as UserAvatar } from './UserAvatar';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as Toast } from './Toast';
 export { ToastProvider, useToast } from './ToastProvider';
+export { default as FeedbackButton } from './FeedbackButton';

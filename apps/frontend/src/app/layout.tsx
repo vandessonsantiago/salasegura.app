@@ -4,6 +4,7 @@ import { ChecklistProvider } from "@/contexts/ChecklistContext";
 import { AgendamentosProvider } from "@/contexts/AgendamentosContext";
 import { DivorceProvider } from "@/contexts/DivorceContext";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import FeedbackButton from "@/components/ui/FeedbackButton";
 import "./styles.css";
 import ClientInit from "../lib/ClientInit";
 
@@ -28,6 +29,7 @@ export default function RootLayout({
                   {/* ClientInit runs only on the client and applies production logging rules */}
                   <ClientInit />
                   {children}
+                  <FeedbackButton />
                 </ToastProvider>
               </DivorceProvider>
             </AgendamentosProvider>

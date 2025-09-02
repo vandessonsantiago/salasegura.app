@@ -437,6 +437,35 @@ export interface Database {
           status?: string;
         };
       };
+      feedback: {
+        Row: {
+          id: number;
+          user_id: string;
+          type: string;
+          message: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          type: string;
+          message: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          type?: string;
+          message?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       app_settings: {
         Row: {
           id: string;
@@ -547,6 +576,10 @@ export type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
 export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row'];
 export type WebhookLogInsert = Database['public']['Tables']['webhook_logs']['Insert'];
 export type WebhookLogUpdate = Database['public']['Tables']['webhook_logs']['Update'];
+
+export type Feedback = Database['public']['Tables']['feedback']['Row'];
+export type FeedbackInsert = Database['public']['Tables']['feedback']['Insert'];
+export type FeedbackUpdate = Database['public']['Tables']['feedback']['Update'];
 
 export type AppSetting = Database['public']['Tables']['app_settings']['Row'];
 export type AppSettingInsert = Database['public']['Tables']['app_settings']['Insert'];

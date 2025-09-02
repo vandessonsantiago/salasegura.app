@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken } from '../../middleware/auth';
 import { ChecklistService } from '../services/ChecklistService';
 
 const router: Router = express.Router();

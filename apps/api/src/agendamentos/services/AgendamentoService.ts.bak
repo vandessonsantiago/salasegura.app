@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { supabaseAdmin as supabase } from '../../lib/supabase';
-import { PaymentService } from '../../payments/services/PaymentService';
+import { PaymentService } from '../../services/PaymentService';
 import { CalendarService } from '../../services/CalendarService';
 import {
   AgendamentoData,
@@ -265,7 +265,9 @@ export class AgendamentoService {
       const paymentResult = await PaymentService.processarPagamentoAsaas(
         cliente,
         agendamento.valor,
-        agendamento.descricao
+        agendamento.descricao,
+        agendamentoId,
+        agendamento.user_id
       );
 
       if (!paymentResult.success) {

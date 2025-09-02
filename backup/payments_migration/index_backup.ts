@@ -6,7 +6,6 @@ import availableSlotsRoutes from "./availableSlots";
 import checkoutRoutes from "./checkout";
 import asaasWebhookRoutes from "./asaasWebhook";
 import { DivorceRoutes } from "../divorce";
-import { PaymentRoutes } from "../payments";
 import { feedbackRouter } from "../feedback";
 import { agendamentoRouter } from "../agendamentos";
 
@@ -21,7 +20,6 @@ router.use("/available-slots", availableSlotsRoutes);
 router.use("/checkout", checkoutRoutes);
 router.use("/asaas-webhook", asaasWebhookRoutes);
 router.use("/divorcio", DivorceRoutes);
-router.use("/payments", PaymentRoutes);
 router.use("/feedback", feedbackRouter);
 
 // Rota de status legada (mantendo compatibilidade)

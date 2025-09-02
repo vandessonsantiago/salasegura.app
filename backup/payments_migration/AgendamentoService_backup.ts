@@ -265,7 +265,9 @@ export class AgendamentoService {
       const paymentResult = await PaymentService.processarPagamentoAsaas(
         cliente,
         agendamento.valor,
-        agendamento.descricao
+        agendamento.descricao,
+        agendamentoId,
+        agendamento.user_id
       );
 
       if (!paymentResult.success) {

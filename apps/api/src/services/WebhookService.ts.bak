@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../lib/supabase';
-import { PaymentService } from '../payments/services/PaymentService';
+import { PaymentService } from './PaymentService';
 import { createCalendarEvent } from './google-calendar';
 
 export interface WebhookPayload {
@@ -34,11 +34,7 @@ export class WebhookService {
       await this.logWebhook(payload);
 
       // Atualizar status do pagamento
-      const success = await PaymentService.updatePaymentStatus(payment.id, payment.status as any);
-
-      if (!success) {
-        console.warn('⚠️ Falha ao atualizar status do pagamento:', payment.id);
-      }
+      await PaymentService.updatePaymentStatus(payment.id, payment.status);
 
       // Processar agendamento/divórcio
       await this.processarEntidade(payment.id, payment.status);

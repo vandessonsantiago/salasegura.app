@@ -3,7 +3,7 @@ import type { Request, Response } from 'express'
 import axios from "axios"
 import { z } from "zod"
 import { authenticateToken } from '../middleware/auth'
-import { CheckoutService } from '../payments/services/CheckoutService'
+import { CheckoutService } from '../services/CheckoutService'
 
 import type { Router } from 'express'
 const router: Router = express.Router()

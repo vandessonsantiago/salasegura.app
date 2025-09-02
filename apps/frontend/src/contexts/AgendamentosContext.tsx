@@ -86,7 +86,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         console.log("📡 [LOAD] Buscando agendamentos do backend...")
         try {
           const result = await authJsonFetch(
-            "/agendamento-new/meu-agendamento",
+            "/agendamentos/user/meu-agendamento",
             session.access_token,
             { method: 'GET' }
           )
@@ -347,11 +347,10 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
       // Fazer chamada para o backend para excluir do banco
       if (session?.access_token) {
         const result = await authJsonFetch(
-          `/agendamento-new/cancelar`,
+          `/agendamentos/${id}/cancelar`,
           session.access_token,
           { 
-            method: 'POST',
-            body: JSON.stringify({ agendamentoId: id })
+            method: 'POST'
           }
         )
 
@@ -496,7 +495,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🔍 [DEBUG] Verificando dados diretamente do backend...")
       const result = await authJsonFetch(
-        "/agendamento-new/meu-agendamento",
+        "/agendamentos/user/meu-agendamento",
         session.access_token,
         { method: 'GET' }
       )
@@ -537,7 +536,7 @@ export function AgendamentosProvider({ children }: { children: ReactNode }) {
         console.log('🔄 [POLLING] Verificando atualizações de status...')
 
         const result = await authJsonFetch(
-          "/agendamento-new/meu-agendamento",
+          "/agendamentos/user/meu-agendamento",
           session.access_token,
           { method: 'GET' }
         )
